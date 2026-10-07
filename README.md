@@ -1,5 +1,6 @@
 Our initial works of this story telling Game
-![Alternative Text](./sample_video.mp4)
+see video here:
+![Video Sample](./video_sample.mp4)
 
 #Initial Look:
 
