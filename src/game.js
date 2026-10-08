@@ -1,6 +1,8 @@
 import playerUrl from '../Assets/avatar.png';
 import bgUrl from '../Assets/bg.jpeg';
 import secondBgUrl from '../Assets/2nd.png';
+import deskUrl from '../Assets/computer_desk.png';
+import { ThreeGame } from './three/ThreeGame.js';
 
 const canvas = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
@@ -28,6 +30,15 @@ const GAME_CODES = new Set([
 ]);
 
 window.addEventListener("keydown", (event) => {
+    // If typing inside the chat input, do not capture movement keys!
+    if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+        if (event.key === "Escape") {
+            document.activeElement.blur();
+            hideChatBubble();
+        }
+        return;
+    }
+
     if (GAME_CODES.has(event.code) || event.key === " " || event.key === "ArrowUp" || event.key === "ArrowDown") {
         event.preventDefault();
     }
@@ -56,6 +67,10 @@ window.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("keyup", (event) => {
+    if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+        return;
+    }
+
     if (event.code === "ArrowLeft" || event.code === "KeyA" || event.key === "a" || event.key === "A") {
         input.left = false;
     }
@@ -123,6 +138,9 @@ outsideBgImg.src = bgUrl;
 const archiveBgImg = new Image();
 archiveBgImg.src = secondBgUrl;
 
+const deskImg = new Image();
+deskImg.src = deskUrl;
+
 // -------------------------
 // SCENE & POPUP MANAGEMENT
 // -------------------------
@@ -167,10 +185,84 @@ if (popupActionBtn) {
     });
 }
 
+// -------------------------
+// RETRO COMPUTER HOOK & MISSION LAUNCH
+// -------------------------
+const COMPUTER_WORLD_X = 520;
+const chatBubble = document.getElementById("computer-chat-bubble");
+const chatMessages = document.getElementById("chat-messages");
+const chatCloseBtn = document.getElementById("chat-close-btn");
+const startMissionBtn = document.getElementById("btn-start-mission");
+let isChatOpen = false;
+let chatGreeted = false;
+let threeGameInstance = null;
+
+function showChatBubble() {
+    if (!chatBubble || isTransitioning || isChatOpen) return;
+    isChatOpen = true;
+    chatBubble.classList.remove("hidden");
+    if (!chatGreeted && chatMessages) {
+        chatGreeted = true;
+        chatMessages.innerHTML = `
+          <div class="chat-msg computer">
+            <span class="msg-sender">ARCH-7 // EMERGENCY BROADCAST</span>
+            <span class="msg-text"><strong>[CRITICAL ALERT — YEAR 2047]</strong><br>Autonomous AI <strong>EVA</strong> has sealed Earth's digital scientific network, concluding that <em>"Human uncertainty is the greatest threat to humanity."</em></span>
+          </div>
+          <div class="chat-msg computer">
+            <span class="msg-sender">ARCH-7 // PROTOCOL RECOVERY</span>
+            <span class="msg-text">Modern databases are locked, but humanity's physical spacecraft left across the Solar System contain the forgotten chain of human scientific deduction—evidence EVA cannot reconstruct.</span>
+          </div>
+          <div class="chat-msg computer">
+            <span class="msg-sender">ARCH-7 // DIRECTIVE</span>
+            <span class="msg-text">You are the <strong>Human Recovery Team</strong>. Inspect the hardware, reconstruct the signals, and recover the 50 clues before EVA permanently purges the archives.</span>
+          </div>
+        `;
+    }
+}
+
+function hideChatBubble() {
+    if (!chatBubble) return;
+    isChatOpen = false;
+    chatBubble.classList.add("hidden");
+}
+
+function launchThreeMission(missionId = "mission-01") {
+    hideChatBubble();
+    const gameContainer = document.getElementById("game-container");
+    const threeContainer = document.getElementById("three-container");
+
+    if (gameContainer && threeContainer) {
+        gameContainer.classList.add("hidden");
+        threeContainer.classList.remove("hidden");
+
+        if (!threeGameInstance) {
+            threeGameInstance = new ThreeGame("three-container", () => {
+                // Return to 2D archive callback
+                threeContainer.classList.add("hidden");
+                gameContainer.classList.remove("hidden");
+            });
+        } else {
+            threeGameInstance.loadMission(missionId);
+            threeGameInstance.onWindowResize();
+        }
+    }
+}
+
+if (startMissionBtn) {
+    startMissionBtn.addEventListener("click", () => {
+        launchThreeMission("mission-01");
+    });
+}
+
+if (chatCloseBtn) {
+    chatCloseBtn.addEventListener("click", hideChatBubble);
+}
+
 function transitionToScene(targetScene) {
     if (isTransitioning) return;
     isTransitioning = true;
     hidePopup();
+    hideChatBubble();
 
     if (fadeOverlay) fadeOverlay.classList.add("fade-active");
 
@@ -239,16 +331,19 @@ function AnimationLoop() {
 
     // 1. Calculate Target Horizontal Velocity
     if (!isTransitioning) {
-        const maxSpeed = input.sprint ? RUN_SPEED : WALK_SPEED;
+        const isTyping = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
+        const maxSpeed = (!isTyping && input.sprint) ? RUN_SPEED : WALK_SPEED;
         let targetVx = 0;
 
-        if (input.right) {
-            targetVx += maxSpeed;
-            facingRight = true;
-        }
-        if (input.left) {
-            targetVx -= maxSpeed;
-            facingRight = false;
+        if (!isTyping) {
+            if (input.right) {
+                targetVx += maxSpeed;
+                facingRight = true;
+            }
+            if (input.left) {
+                targetVx -= maxSpeed;
+                facingRight = false;
+            }
         }
 
         // Smooth Acceleration & Friction
@@ -260,7 +355,7 @@ function AnimationLoop() {
         }
 
         // 2. Jump Physics
-        if (input.jump && isGrounded) {
+        if (!isTyping && input.jump && isGrounded) {
             vy = input.sprint ? JUMP_FORCE * 1.1 : JUMP_FORCE;
             isGrounded = false;
         }
@@ -342,11 +437,12 @@ function AnimationLoop() {
             i = 1;
         }
 
-        // 5. Zone / Gate Detection
+        // 5. Zone / Gate Detection & Computer Proximity
         const worldX = pos - pos1;
 
         if (currentScene === "outside") {
-            // NASA Archive Gate Zone (around the building doors under "NASA ARCHIVE")
+            hideChatBubble();
+            // NASA Archive Gate Zone (under "NASA ARCHIVE" sign)
             const isNearArchiveGate = (worldX >= 1830 && worldX <= 2040);
             if (isNearArchiveGate) {
                 showPopup({
@@ -360,7 +456,7 @@ function AnimationLoop() {
                 hidePopup();
             }
         } else if (currentScene === "archive") {
-            // Door B-3 Exit Zone (far left exit door)
+            // Door B-3 Exit Zone (far left)
             const isNearArchiveExit = (worldX <= 160);
             if (isNearArchiveExit) {
                 showPopup({
@@ -372,6 +468,14 @@ function AnimationLoop() {
                 });
             } else {
                 hidePopup();
+            }
+
+            // Computer Desk Proximity Check
+            const isNearComputer = Math.abs(worldX - (COMPUTER_WORLD_X + 58)) < 90;
+            if (isNearComputer) {
+                showChatBubble();
+            } else {
+                hideChatBubble();
             }
         }
     }
@@ -388,6 +492,56 @@ function AnimationLoop() {
             bgRenderWidth,
             300
         );
+    }
+
+    // Draw Computer Desk in Scene 2 (archive)
+    if (currentScene === "archive") {
+        const deskX = COMPUTER_WORLD_X + pos1;
+        const deskY = 178;
+        const deskW = 116;
+        const deskH = 92;
+
+        ctx.save();
+        // Soft contact shadow under desk feet on floor
+        ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+        ctx.beginPath();
+        ctx.ellipse(deskX + (deskW / 2), 270, 58, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw exact Computer Desk sprite
+        if (deskImg.complete && deskImg.naturalWidth > 0) {
+            ctx.drawImage(
+                deskImg,
+                deskX,
+                deskY,
+                deskW,
+                deskH
+            );
+        }
+
+        // Ambient CRT monitor screen glow on the desk
+        const glow = ctx.createRadialGradient(
+            deskX + 38, deskY + 30, 4,
+            deskX + 38, deskY + 45, 52
+        );
+        glow.addColorStop(0, "rgba(34, 197, 94, 0.35)");
+        glow.addColorStop(0.6, "rgba(34, 197, 94, 0.08)");
+        glow.addColorStop(1, "rgba(34, 197, 94, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(deskX - 10, deskY - 10, deskW + 20, deskH + 20);
+
+        // Floating label indicator
+        const charWorldX = pos - pos1;
+        const isNearComp = Math.abs(charWorldX - (COMPUTER_WORLD_X + (deskW / 2))) < 90;
+        if (isNearComp) {
+            ctx.fillStyle = "#22c55e";
+            ctx.font = "bold 10px monospace";
+            ctx.textAlign = "center";
+            const bounce = Math.sin(Date.now() / 200) * 2;
+            ctx.fillText("💬 ARCH-7 ONLINE", deskX + (deskW / 2), deskY - 8 + bounce);
+        }
+
+        ctx.restore();
     }
 
     // Draw Player Character

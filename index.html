@@ -3,9 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Mohasunno</title>
+    <title>The Last Human Mission</title>
   </head>
   <body>
+    <!-- 2D Exploration Game Container -->
     <div id="game-container">
       <canvas id="myCanvas"></canvas>
 
@@ -23,6 +24,25 @@
           <button id="popup-action-btn" class="popup-btn">
             <span id="popup-btn-label">Enter NASA Archive</span>
             <span class="key-hint">[E]</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Retro Computer Hook Dialog (Scene 2) -->
+      <div id="computer-chat-bubble" class="hidden">
+        <div class="chat-header">
+          <div class="chat-terminal-badge">
+            <span class="crt-dot"></span>
+            <span class="terminal-title">ARCH-7 // TERMINAL</span>
+          </div>
+          <button id="chat-close-btn" class="chat-close" title="Close dialog (Esc)">✕</button>
+        </div>
+        <div id="chat-messages" class="chat-messages">
+          <!-- Story messages from ARCH-7 will be populated here -->
+        </div>
+        <div class="mission-hook-footer">
+          <button id="btn-start-mission" class="mission-start-btn">
+            🚀 START MISSION 01: FIRST SIGNAL
           </button>
         </div>
       </div>
@@ -55,6 +75,132 @@
         </button>
       </div>
     </div>
+
+    <!-- 3D Three.js Mission Container -->
+    <div id="three-container" class="hidden">
+      <canvas id="three-canvas"></canvas>
+
+      <!-- 3D Top HUD -->
+      <div class="three-hud">
+        <div class="hud-left">
+          <div class="hud-badge-row">
+            <span class="mission-badge" id="hud-mission-title">MISSION 01 — FIRST SIGNAL</span>
+            <span class="era-badge" id="hud-era">PIONEER ERA</span>
+          </div>
+          <div class="hardware-name" id="hud-hardware">PIONEER 10 INTERSTELLAR PROBE</div>
+          <div class="objective-box">
+            <span class="obj-label">OBJECTIVE:</span>
+            <span id="hud-objective">Reconstruct lost deep-space telemetry carrier wave.</span>
+          </div>
+        </div>
+
+        <div class="hud-right">
+          <div class="clue-pill" id="hud-vault-pill">
+            <span class="pill-icon">🗃️</span>
+            <span class="pill-label">MEMORY VAULT:</span>
+            <span class="pill-count" id="hud-clue-count">0 / 5</span>
+          </div>
+          <button id="btn-toggle-vault" class="hud-btn vault-btn">🗃️ MEMORY VAULT</button>
+          <button id="btn-mission-select" class="hud-btn mission-btn">🚀 MISSION SELECT</button>
+          <button id="btn-return-archive" class="hud-btn return-btn">◀ ARCHIVE TERMINAL</button>
+        </div>
+      </div>
+
+      <!-- 3D Tooltip for Hovering on Hardware -->
+      <div id="three-tooltip" class="three-tooltip hidden"></div>
+
+      <!-- Clue Toast Notification -->
+      <div id="clue-toast" class="clue-toast hidden"></div>
+
+      <!-- Mission Loading Indicator -->
+      <div id="mission-loader" class="mission-loader hidden">
+        RECONSTRUCTING MISSION ARCHIVE...
+      </div>
+
+      <!-- Puzzle Modal -->
+      <div id="puzzle-modal" class="modal-backdrop hidden">
+        <div class="puzzle-card">
+          <div class="puzzle-header">
+            <div>
+              <h2 id="puzzle-title">PUZZLE TITLE</h2>
+              <p id="puzzle-subtitle">Scientific task instructions</p>
+            </div>
+            <button id="puzzle-close-btn" class="modal-close">✕</button>
+          </div>
+          <div id="puzzle-body" class="puzzle-content">
+            <!-- Dynamic puzzle UI injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Memory Vault Modal -->
+      <div id="vault-modal" class="modal-backdrop hidden">
+        <div class="vault-card">
+          <div class="vault-header">
+            <div>
+              <h2>THE MEMORY VAULT</h2>
+              <p>Recovered Physical Scientific Evidence from NASA Hardware</p>
+            </div>
+            <button id="vault-close-btn" class="modal-close">✕</button>
+          </div>
+          <div id="vault-clues-list" class="vault-body">
+            <!-- Rendered by MemoryVault.js -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Mission Select Modal -->
+      <div id="mission-select-modal" class="modal-backdrop hidden">
+        <div class="select-card">
+          <div class="select-header">
+            <h2>SELECT RECOVERY MISSION</h2>
+            <p>Chronological NASA Exploration Hardware Archive</p>
+            <button id="mission-select-close" class="modal-close">✕</button>
+          </div>
+          <div class="mission-grid-select">
+            <div class="mission-card-select" data-mission="mission-01">
+              <span class="m-num">MISSION 01</span>
+              <h4>FIRST SIGNAL</h4>
+              <p>Pioneer 10 // Jupiter Flyby & Solar Escape</p>
+              <span class="m-status">AVAILABLE</span>
+            </div>
+            <div class="mission-card-select" data-mission="mission-02">
+              <span class="m-num">MISSION 02</span>
+              <h4>THE LUNAR ARCHIVE</h4>
+              <p>Apollo Lunar Module & LADEE // Moon</p>
+              <span class="m-status">AVAILABLE</span>
+            </div>
+            <div class="mission-card-select" data-mission="mission-04">
+              <span class="m-num">MISSION 04</span>
+              <h4>THE RED PLANET</h4>
+              <p>Viking, Opportunity & Ingenuity // Mars</p>
+              <span class="m-status">AVAILABLE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mission Debrief Modal -->
+      <div id="debrief-modal" class="modal-backdrop hidden">
+        <div class="debrief-card">
+          <div class="debrief-icon">★</div>
+          <h2 id="debrief-title">MISSION COMPLETE</h2>
+          <div class="debrief-section">
+            <h4>HISTORICAL CONTEXT</h4>
+            <p id="debrief-history"></p>
+          </div>
+          <div class="debrief-section">
+            <h4>SCIENTIFIC PRINCIPLE RECOVERED</h4>
+            <p id="debrief-science"></p>
+          </div>
+          <div class="debrief-score" id="debrief-score">
+            SCORE: 100 PTS // RANK: FIELD SCIENTIST
+          </div>
+          <button id="debrief-next-btn" class="solve-btn ready">CONTINUE TO NEXT MISSION ➔</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
