@@ -2,19 +2,19 @@ Our initial works of this story telling Game
 
 
 #see video here:
-![Video Sample](./video_sample.mp4)
+![Video Sample](./Assets/video_sample.mp4)
 
 #Initial Look:
 
 
-![look](./look.png)
+![look](./Assets/look.png)
 
 #Main Avatar:(Aohin)
 
 
-![Alternative Text](./avatar.png)
+![Alternative Text](./Assets/avatar.png)
 
 Worlds:1
-![Alternative Text](./2nd.png)
+![Alternative Text](./Assets/2nd.png)
 World:2
-![Alternative Text](./bg.jpeg)
+![Alternative Text](./Assets/bg.jpeg)
