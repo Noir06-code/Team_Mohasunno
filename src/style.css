@@ -1,0 +1,305 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0d0f17;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, #181926 0%, #0a0b12 100%);
+}
+
+#myCanvas {
+  display: block;
+  /* Responsively fit the full screen on bigger screens while preserving 800:300 aspect ratio */
+  width: min(100vw, calc(100vh * (800 / 300)));
+  height: min(100vh, calc(100vw * (300 / 800)));
+  aspect-ratio: 800 / 300;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  background-color: #000;
+}
+
+/* Screen Transition Fade Overlay */
+#fade-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease-in-out;
+  z-index: 50;
+}
+
+#fade-overlay.fade-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Interactive Gate Popup */
+#gate-popup {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  z-index: 30;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: auto;
+  animation: floatBounce 2.4s ease-in-out infinite;
+}
+
+#gate-popup.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+  pointer-events: none;
+  animation: none;
+}
+
+@keyframes floatBounce {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-6px);
+  }
+}
+
+.popup-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(13, 17, 28, 0.92);
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 25px rgba(59, 130, 246, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 20px;
+  border-radius: 14px;
+  color: #fff;
+}
+
+.popup-icon {
+  font-size: 26px;
+  background: rgba(30, 58, 138, 0.4);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 10px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup-content h3 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #60a5fa;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.popup-content p {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 2px 0 0 0;
+}
+
+.popup-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border: 1px solid #93c5fd;
+  color: #ffffff;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+.popup-btn:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.65);
+}
+
+.popup-btn:active {
+  transform: translateY(1px);
+}
+
+.popup-btn .key-hint {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+/* Touch Controls */
+#touch-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 24px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.touch-group {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.touch-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(20, 24, 38, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.1s, background-color 0.15s, border-color 0.15s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.touch-btn:active,
+.touch-btn.active {
+  background: rgba(80, 120, 240, 0.8);
+  border-color: rgba(255, 255, 255, 0.8);
+  transform: scale(0.92);
+}
+
+.action-btn.jump-btn {
+  background: rgba(50, 160, 90, 0.65);
+}
+
+.action-btn.jump-btn:active,
+.action-btn.jump-btn.active {
+  background: rgba(60, 200, 110, 0.85);
+}
+
+.action-btn.sprint-btn {
+  background: rgba(210, 140, 30, 0.65);
+  font-size: 18px;
+}
+
+.action-btn.sprint-btn:active,
+.action-btn.sprint-btn.active {
+  background: rgba(255, 170, 30, 0.85);
+}
+
+/* Hide touch controls on desktop mouse devices by default, show on touch devices */
+@media (hover: hover) and (pointer: fine) {
+  #touch-controls {
+    display: none;
+  }
+}
+
+/* UI Overlay (Hints & Fullscreen) */
+#ui-overlay {
+  position: absolute;
+  bottom: 12px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0.75;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+#ui-overlay:hover {
+  opacity: 1;
+}
+
+.controls-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #c0c5d8;
+  background: rgba(15, 18, 28, 0.6);
+  backdrop-filter: blur(4px);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.controls-hint kbd {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+#fullscreen-btn {
+  background: rgba(15, 18, 28, 0.6);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.1s;
+}
+
+#fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+#fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 680px) {
+  .controls-hint {
+    display: none;
+  }
+}

@@ -1,20 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        #myCanvas{
-            
-            border: 1px solid black;
-        }
-    </style>
-</head>
-<body style="display: flex; justify-content: center; align-items: center;">
-    <canvas id="myCanvas">
-        
-    </canvas>
-</body>
-<script src="./game.js"></script>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Mohasunno</title>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="myCanvas"></canvas>
+
+      <!-- Screen Transition Fade Overlay -->
+      <div id="fade-overlay"></div>
+
+      <!-- Interactive Gate Popup / Modal -->
+      <div id="gate-popup" class="hidden">
+        <div class="popup-card">
+          <div class="popup-icon" id="popup-icon">🏛️</div>
+          <div class="popup-content">
+            <h3 id="popup-title">NASA ARCHIVE</h3>
+            <p id="popup-desc">Central Records Facility</p>
+          </div>
+          <button id="popup-action-btn" class="popup-btn">
+            <span id="popup-btn-label">Enter NASA Archive</span>
+            <span class="key-hint">[E]</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Touch Controls for Mobile/Touchscreens -->
+      <div id="touch-controls">
+        <div class="touch-group touch-dpad">
+          <button id="btn-left" class="touch-btn" aria-label="Move Left">◀</button>
+          <button id="btn-right" class="touch-btn" aria-label="Move Right">▶</button>
+        </div>
+        <div class="touch-group touch-actions">
+          <button id="btn-sprint" class="touch-btn action-btn sprint-btn" aria-label="Sprint">⚡</button>
+          <button id="btn-jump" class="touch-btn action-btn jump-btn" aria-label="Jump">▲</button>
+        </div>
+      </div>
+
+      <!-- UI Overlay: Instructions & Fullscreen -->
+      <div id="ui-overlay">
+        <div class="controls-hint">
+          <span><kbd>A</kbd><kbd>D</kbd> / <kbd>◀</kbd><kbd>▶</kbd> Walk</span>
+          <span><kbd>Shift</kbd> Sprint</span>
+          <span><kbd>W</kbd> / <kbd>Space</kbd> / <kbd>▲</kbd> Jump</span>
+          <span><kbd>E</kbd> Enter / Interact</span>
+          <span><kbd>F</kbd> Fullscreen</span>
+        </div>
+        <button id="fullscreen-btn" title="Toggle Fullscreen (or press F)" aria-label="Toggle Fullscreen">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>

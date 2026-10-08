@@ -1,16 +1,43 @@
+# Mohasunno
+
 Our initial works of this story telling Game
 
+## Getting Started
 
-#see video here:
+### Prerequisites
+- Node.js (v18+)
+- npm
+
+### Installation
+```bash
+npm install
+```
+
+### Development Server
+```bash
+npm run dev
+```
+
+### Production Build
+```bash
+npm run build
+```
+
+### Preview Build
+```bash
+npm run preview
+```
+
+---
+
+# see video here:
 ![Video Sample](./Assets/video_sample.mp4)
 
-#Initial Look:
-
+# Initial Look:
 
 ![look](./Assets/look.png)
 
-#Main Avatar:(Aohin)
-
+# Main Avatar:(Aohin)
 
 ![Alternative Text](./Assets/avatar.png)
 
