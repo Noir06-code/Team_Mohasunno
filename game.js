@@ -29,10 +29,10 @@ window.addEventListener("keyup", (event) => {
 
 // Images
 const player = new Image();
-player.src = "avatar.png";
+player.src = "./Assests/avatar.png";
 
 const bgimg = new Image();
-bgimg.src = "bg.jpeg";
+bgimg.src = "./Assests/bg.jpeg";
 
 
 // Variables
