@@ -4,11 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>The Last Human Mission</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      /* Critical pre-load styling to guarantee zero flash of unstyled content (FOUC) */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #0d192e;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .hidden {
+        display: none !important;
+      }
+      #three-container.hidden, #gate-popup.hidden, #computer-chat-bubble.hidden, .modal-backdrop.hidden {
+        display: none !important;
+      }
+    </style>
   </head>
   <body>
+    <!-- Simple Sleek App Loader (Zero Popups) -->
+    <div id="simple-app-loader" class="simple-app-loader">
+      <div class="simple-loader-card">
+        <div class="simple-loader-spinner"></div>
+        <div class="simple-loader-text">
+          <span class="simple-loader-tag"><i data-lucide="sparkles"></i> NASA RECOVERY ARCHIVE</span>
+          <span class="simple-loader-title">INITIALIZING FIELD SYSTEMS...</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 2D Exploration Game Container -->
     <div id="game-container">
       <canvas id="myCanvas"></canvas>
+
+      <!-- Student Quest / Objective Banner -->
+      <div id="student-quest-banner" class="student-quest-banner">
+        <span class="quest-tag"><i data-lucide="sparkles"></i> DIRECTIVE</span>
+        <span id="quest-text">Walk right towards the NASA Archive Gate to begin recovery.</span>
+      </div>
 
       <!-- Screen Transition Fade Overlay -->
       <div id="fade-overlay"></div>
@@ -16,7 +55,7 @@
       <!-- Interactive Gate Popup / Modal -->
       <div id="gate-popup" class="hidden">
         <div class="popup-card">
-          <div class="popup-icon" id="popup-icon">🏛️</div>
+          <div class="popup-icon" id="popup-icon"><i data-lucide="landmark"></i></div>
           <div class="popup-content">
             <h3 id="popup-title">NASA ARCHIVE</h3>
             <p id="popup-desc">Central Records Facility</p>
@@ -28,50 +67,90 @@
         </div>
       </div>
 
-      <!-- Retro Computer Hook Dialog (Scene 2) -->
-      <div id="computer-chat-bubble" class="hidden">
+      <!-- Retro Computer Chat Bubble (Scene 2 - Floating directly over the PC) -->
+      <div id="computer-chat-bubble" class="hidden computer-chat-bubble">
         <div class="chat-header">
           <div class="chat-terminal-badge">
             <span class="crt-dot"></span>
-            <span class="terminal-title">ARCH-7 // TERMINAL</span>
+            <span class="terminal-title" id="chat-terminal-title"><i data-lucide="terminal"></i> TULIP // EMERGENCY TERMINAL</span>
           </div>
-          <button id="chat-close-btn" class="chat-close" title="Close dialog (Esc)">✕</button>
+          <button id="chat-close-btn" class="chat-close" title="Close dialog (Esc)"><i data-lucide="x"></i></button>
         </div>
-        <div id="chat-messages" class="chat-messages">
-          <!-- Story messages from ARCH-7 will be populated here -->
+        <div class="chat-bubble-inner">
+          <div class="chat-step-indicator" id="chat-step-indicator">TRANSMISSION 1 / 3</div>
+          <div id="chat-messages" class="chat-messages">
+            <!-- Sequential message typed here -->
+          </div>
         </div>
         <div class="mission-hook-footer">
-          <button id="btn-start-mission" class="mission-start-btn">
-            🚀 START MISSION 01: FIRST SIGNAL
+          <div class="chat-step-dots" id="chat-step-dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <button id="btn-next-dialog" class="chat-action-btn primary">
+            <span id="chat-btn-label">NEXT</span>
+            <i data-lucide="chevron-right" id="chat-btn-icon"></i>
+            <span class="key-hint">[E]</span>
           </button>
+        </div>
+        <!-- Downward pointer tail to CRT monitor on desk -->
+        <div class="computer-bubble-tail"></div>
+      </div>
+
+      <!-- Time Travel Simulation UI (Delayed Transition to 2047) -->
+      <div id="time-travel-modal" class="time-travel-overlay hidden">
+        <div class="time-travel-scanlines"></div>
+        <div class="time-travel-card">
+          <div class="time-travel-badge">
+            <span class="pulse-orbit-dot"></span>
+            <span><i data-lucide="orbit"></i> TEMPORAL TRAJECTORY SIMULATOR</span>
+          </div>
+          <div class="time-travel-year-display">
+            <span class="year-label">SIMULATION DESTINATION:</span>
+            <div class="year-counter" id="temporal-year-counter">YEAR 2027</div>
+          </div>
+          <div class="time-travel-path">
+            <div class="time-step past">2027</div>
+            <div class="time-arrow">──►</div>
+            <div class="time-step midway" id="time-step-mid1">2034</div>
+            <div class="time-arrow">──►</div>
+            <div class="time-step midway" id="time-step-mid2">2041</div>
+            <div class="time-arrow">──►</div>
+            <div class="time-step future" id="time-step-target">2047</div>
+          </div>
+          <div class="time-travel-bar-container">
+            <div class="time-travel-bar" id="temporal-progress-bar"></div>
+          </div>
+          <div class="time-travel-status" id="temporal-status-text">
+            WARPING SENSOR TELEMETRY TO 2047...
+          </div>
         </div>
       </div>
 
       <!-- Touch Controls for Mobile/Touchscreens -->
       <div id="touch-controls">
         <div class="touch-group touch-dpad">
-          <button id="btn-left" class="touch-btn" aria-label="Move Left">◀</button>
-          <button id="btn-right" class="touch-btn" aria-label="Move Right">▶</button>
+          <button id="btn-left" class="touch-btn" aria-label="Move Left"><i data-lucide="arrow-left"></i></button>
+          <button id="btn-right" class="touch-btn" aria-label="Move Right"><i data-lucide="arrow-right"></i></button>
         </div>
         <div class="touch-group touch-actions">
-          <button id="btn-sprint" class="touch-btn action-btn sprint-btn" aria-label="Sprint">⚡</button>
-          <button id="btn-jump" class="touch-btn action-btn jump-btn" aria-label="Jump">▲</button>
+          <button id="btn-sprint" class="touch-btn action-btn sprint-btn" aria-label="Sprint"><i data-lucide="zap"></i></button>
+          <button id="btn-jump" class="touch-btn action-btn jump-btn" aria-label="Jump"><i data-lucide="arrow-up"></i></button>
         </div>
       </div>
 
       <!-- UI Overlay: Instructions & Fullscreen -->
       <div id="ui-overlay">
         <div class="controls-hint">
-          <span><kbd>A</kbd><kbd>D</kbd> / <kbd>◀</kbd><kbd>▶</kbd> Walk</span>
+          <span><kbd>A</kbd><kbd>D</kbd> / Arrow keys to Walk</span>
           <span><kbd>Shift</kbd> Sprint</span>
-          <span><kbd>W</kbd> / <kbd>Space</kbd> / <kbd>▲</kbd> Jump</span>
+          <span><kbd>W</kbd> / <kbd>Space</kbd> Jump</span>
           <span><kbd>E</kbd> Enter / Interact</span>
           <span><kbd>F</kbd> Fullscreen</span>
         </div>
-        <button id="fullscreen-btn" title="Toggle Fullscreen (or press F)" aria-label="Toggle Fullscreen">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-          </svg>
+        <button id="fullscreen-btn" title="Toggle Fullscreen (F)" aria-label="Toggle Fullscreen">
+          <i data-lucide="maximize-2"></i>
         </button>
       </div>
     </div>
@@ -92,17 +171,194 @@
             <span class="obj-label">OBJECTIVE:</span>
             <span id="hud-objective">Reconstruct lost deep-space telemetry carrier wave.</span>
           </div>
+          <!-- Mission Time Constraint -->
+          <div class="hud-timer-badge" id="hud-mission-timer-badge" title="Mission Time Constraint">
+            <i data-lucide="timer"></i>
+            <span class="timer-label">LIMIT:</span>
+            <span class="timer-value" id="hud-timer-value">05:00</span>
+            <div class="timer-progress-track">
+              <div class="timer-progress-fill" id="hud-timer-progress"></div>
+            </div>
+          </div>
         </div>
 
         <div class="hud-right">
           <div class="clue-pill" id="hud-vault-pill">
-            <span class="pill-icon">🗃️</span>
-            <span class="pill-label">MEMORY VAULT:</span>
+            <span class="pill-icon"><i data-lucide="database"></i></span>
+            <span class="pill-label">VAULT:</span>
             <span class="pill-count" id="hud-clue-count">0 / 5</span>
           </div>
-          <button id="btn-toggle-vault" class="hud-btn vault-btn">🗃️ MEMORY VAULT</button>
-          <button id="btn-mission-select" class="hud-btn mission-btn">🚀 MISSION SELECT</button>
-          <button id="btn-return-archive" class="hud-btn return-btn">◀ ARCHIVE TERMINAL</button>
+
+          <!-- Camera View Switcher Dropdown -->
+          <div class="camera-dropdown-container">
+            <button id="btn-camera-dropdown" class="hud-btn cam-btn" title="Change Camera View & Celestial Focus">
+              <i data-lucide="video"></i>
+              <span id="cam-active-name">ORBIT CAM</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div id="cam-view-menu" class="cam-menu hidden">
+              <div class="cam-menu-section">PERSPECTIVES</div>
+              <button class="cam-item active" data-target="target"><i data-lucide="target"></i> Mission Spacecraft</button>
+              <button class="cam-item" data-target="cockpit"><i data-lucide="eye"></i> Spacecraft Cockpit / POV</button>
+              <button class="cam-item" data-target="free"><i data-lucide="orbit"></i> 360° Free Space Cam</button>
+              <div class="cam-menu-section">SOLAR SYSTEM BODIES</div>
+              <button class="cam-item" data-target="sun"><i data-lucide="sun"></i> The Sun (Sol)</button>
+              <button class="cam-item" data-target="mercury"><i data-lucide="circle"></i> Mercury</button>
+              <button class="cam-item" data-target="venus"><i data-lucide="flame"></i> Venus</button>
+              <button class="cam-item" data-target="earth"><i data-lucide="globe"></i> Earth (Terra)</button>
+              <button class="cam-item" data-target="moon"><i data-lucide="moon"></i> The Moon (Luna)</button>
+              <button class="cam-item" data-target="mars"><i data-lucide="compass"></i> Mars</button>
+              <button class="cam-item" data-target="ceres"><i data-lucide="sparkles"></i> Asteroid Belt (Ceres)</button>
+              <button class="cam-item" data-target="jupiter"><i data-lucide="orbit"></i> Jupiter</button>
+              <button class="cam-item" data-target="saturn"><i data-lucide="disc"></i> Saturn & Rings</button>
+              <button class="cam-item" data-target="uranus"><i data-lucide="circle-dot"></i> Uranus</button>
+              <button class="cam-item" data-target="neptune"><i data-lucide="waves"></i> Neptune</button>
+            </div>
+          </div>
+
+          <!-- Ride Space Shuttle Button -->
+          <button id="btn-ride-shuttle" class="hud-btn shuttle-btn" title="Launch & Pilot Space Shuttle from Earth">
+            <i data-lucide="rocket"></i> RIDE SHUTTLE
+          </button>
+
+          <button id="btn-student-guide" class="hud-btn guide-btn" title="Student Field Guide">
+            <i data-lucide="help-circle"></i> GUIDE
+          </button>
+          <button id="btn-toggle-vault" class="hud-btn vault-btn">
+            <i data-lucide="database"></i> VAULT
+          </button>
+          <button id="btn-mission-select" class="hud-btn mission-btn">
+            <i data-lucide="compass"></i> MISSIONS
+          </button>
+          <button id="btn-hud-timeline" class="hud-btn timeline-btn" title="NASA Historical Chronological Timeline Directory (PDF Archive)">
+            <i data-lucide="book-marked"></i> TIMELINE
+          </button>
+          <button id="btn-toggle-sound" class="hud-btn sound-btn" title="Toggle Audio (Synth)">
+            <i data-lucide="volume-2"></i>
+          </button>
+          <button id="btn-return-archive" class="hud-btn return-btn">
+            <i data-lucide="chevron-left"></i> ARCHIVE
+          </button>
+        </div>
+      </div>
+
+      <!-- Actual Real-World Live Time Display in Bottom Left -->
+      <div id="actual-time-display" class="actual-time-display">
+        <div class="actual-time-row">
+          <i data-lucide="clock"></i>
+          <span id="actual-time-clock">--:--:--</span>
+          <span class="actual-time-badge" id="actual-time-zone">LOCAL</span>
+        </div>
+        <div class="actual-date-row">
+          <span id="actual-time-date">OCT 15, 2026</span>
+          <span class="time-dot">•</span>
+          <span id="actual-time-utc">--:-- UTC</span>
+        </div>
+      </div>
+
+      <!-- Celestial Focus Info Badge (When inspecting a planet) -->
+      <div id="celestial-info-card" class="celestial-info-card hidden">
+        <div class="celestial-card-header">
+          <span class="celestial-icon" id="celestial-icon"><i data-lucide="globe"></i></span>
+          <div>
+            <h4 id="celestial-title">EARTH</h4>
+            <span class="celestial-type" id="celestial-type">Terrestrial Planet</span>
+          </div>
+          <button id="btn-close-celestial-cam" class="celestial-close-btn" title="Return to Spacecraft">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <p id="celestial-desc" class="celestial-desc">Distance: 1.00 AU • Diameter: 12,742 km</p>
+        <button id="btn-return-to-spacecraft" class="celestial-return-btn">
+          <i data-lucide="arrow-left"></i> RETURN TO MISSION PROBE
+        </button>
+      </div>
+
+      <!-- Space Shuttle Flight Cockpit HUD Overlay -->
+      <div id="shuttle-flight-hud" class="shuttle-flight-hud hidden">
+        <div class="shuttle-hud-top">
+          <div class="shuttle-flight-badge">
+            <span class="pulse-green-dot"></span>
+            <span><i data-lucide="rocket"></i> SPACE SHUTTLE ORBITER // INTERPLANETARY CRUISE</span>
+          </div>
+          <button id="btn-exit-shuttle-flight" class="shuttle-exit-btn">
+            <i data-lucide="x"></i> EXIT FLIGHT
+          </button>
+        </div>
+
+        <div class="shuttle-telemetry-panel">
+          <div class="telemetry-item">
+            <span class="telem-label">VELOCITY</span>
+            <span class="telem-val" id="shuttle-speed-val">24.5 km/s</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telem-label">THROTTLE</span>
+            <span class="telem-val highlight" id="shuttle-throttle-val">80%</span>
+            <div class="throttle-gauge">
+              <div class="throttle-gauge-fill" id="shuttle-throttle-fill" style="width: 80%;"></div>
+            </div>
+          </div>
+          <div class="telemetry-item">
+            <span class="telem-label">PROXIMITY</span>
+            <span class="telem-val" id="shuttle-proximity-val">MARS (14,200 km)</span>
+          </div>
+          <div class="telemetry-actions">
+            <button id="btn-shuttle-warp" class="shuttle-action-pill" title="Toggle Interplanetary Warp Cruise (Space)">
+              <i data-lucide="zap"></i> WARP BOOST
+            </button>
+            <button id="btn-shuttle-cam" class="shuttle-action-pill" title="Cycle Camera: Chase / Cockpit / Orbit (C)">
+              <i data-lucide="video"></i> <span id="shuttle-cam-name">CHASE CAM</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Destination Autopilot Bar -->
+        <div class="shuttle-nav-bar">
+          <span class="nav-bar-label"><i data-lucide="compass"></i> AUTOPILOT NAV:</span>
+          <button class="shuttle-nav-btn" data-nav="SUN">SUN</button>
+          <button class="shuttle-nav-btn" data-nav="MERCURY">MERCURY</button>
+          <button class="shuttle-nav-btn" data-nav="VENUS">VENUS</button>
+          <button class="shuttle-nav-btn" data-nav="EARTH">EARTH</button>
+          <button class="shuttle-nav-btn" data-nav="MOON">MOON</button>
+          <button class="shuttle-nav-btn" data-nav="MARS">MARS</button>
+          <button class="shuttle-nav-btn" data-nav="CERES">ASTEROIDS</button>
+          <button class="shuttle-nav-btn" data-nav="JUPITER">JUPITER</button>
+          <button class="shuttle-nav-btn" data-nav="SATURN">SATURN</button>
+          <button class="shuttle-nav-btn" data-nav="URANUS">URANUS</button>
+          <button class="shuttle-nav-btn" data-nav="NEPTUNE">NEPTUNE</button>
+        </div>
+
+        <!-- Mobile Touch Flight Controls Overlay -->
+        <div class="shuttle-touch-controls" id="shuttle-touch-controls">
+          <div class="touch-flight-dpad">
+            <button id="touch-pitch-up" class="touch-f-btn"><i data-lucide="chevron-up"></i></button>
+            <div class="touch-f-row">
+              <button id="touch-yaw-left" class="touch-f-btn"><i data-lucide="chevron-left"></i></button>
+              <button id="touch-yaw-right" class="touch-f-btn"><i data-lucide="chevron-right"></i></button>
+            </div>
+            <button id="touch-pitch-down" class="touch-f-btn"><i data-lucide="chevron-down"></i></button>
+          </div>
+          <div class="touch-flight-throttle">
+            <button id="touch-throttle-up" class="touch-f-btn accel"><i data-lucide="plus"></i> THRUST</button>
+            <button id="touch-throttle-down" class="touch-f-btn decel"><i data-lucide="minus"></i> BRAKE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mission Time Expired Recharge Modal -->
+      <div id="time-expired-modal" class="modal-backdrop hidden">
+        <div class="time-expired-card">
+          <div class="time-expired-icon"><i data-lucide="alert-triangle"></i></div>
+          <h3>MISSION TIME WINDOW EXHAUSTED</h3>
+          <p>Deep-space telemetry relay signal with TULIP Archive is fading under EVA signal interference. Engage emergency quantum link recharge to extend observation window.</p>
+          <div class="time-recharge-actions">
+            <button id="btn-recharge-time" class="solve-btn ready">
+              <i data-lucide="refresh-cw"></i> RECHARGE TELEMETRY (+2:00 MINUTES)
+            </button>
+            <button id="btn-return-archive-expired" class="solve-btn secondary">
+              <i data-lucide="chevron-left"></i> RETURN TO ARCHIVE
+            </button>
+          </div>
         </div>
       </div>
 
@@ -117,6 +373,53 @@
         RECONSTRUCTING MISSION ARCHIVE...
       </div>
 
+      <!-- Student Field Guide Modal -->
+      <div id="student-guide-modal" class="modal-backdrop hidden">
+        <div class="guide-card">
+          <div class="guide-header">
+            <div>
+              <div class="guide-badge"><i data-lucide="sparkles"></i> FIELD TRAINING MANUAL</div>
+              <h2>HOW TO RECOVER SCIENTIFIC EVIDENCE</h2>
+              <p>NASA Spacecraft Investigation Guide for Students & Recruits</p>
+            </div>
+            <button id="guide-close-btn" class="modal-close"><i data-lucide="x"></i></button>
+          </div>
+          <div class="guide-body">
+            <div class="guide-step">
+              <div class="step-num">1</div>
+              <div class="step-info">
+                <h4><i data-lucide="orbit"></i> Orbit & Inspect Real 3D Spacecraft</h4>
+                <p>Click & drag your mouse (or swipe on touchscreen) to rotate around the authentic NASA 3D spacecraft. Scroll to zoom in on radio antennas, thrusters, and scientific payloads.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="step-num">2</div>
+              <div class="step-info">
+                <h4><i data-lucide="radio"></i> Click Glowing Holographic Beacons</h4>
+                <p>Interactive hardware components pulse with cyan holographic rings. Click any beacon to open its scientific challenge or uncover hidden physical clues.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="step-num">3</div>
+              <div class="step-info">
+                <h4><i data-lucide="database"></i> Reconstruct Clues & Defeat EVA</h4>
+                <p>Solve radio wave matching, orbital slingshots, and telemetry ordering. Recover all 5 clues per mission into your Memory Vault to preserve humanity's knowledge!</p>
+              </div>
+            </div>
+            <div class="guide-checklist-box">
+              <h4>MISSION 01 CHECKLIST:</h4>
+              <ul id="guide-mission-checklist" class="guide-checklist">
+                <li><i data-lucide="radio"></i> Reconstruct 2.29 GHz S-Band Carrier Wave (High-Gain Dish)</li>
+                <li><i data-lucide="orbit"></i> Calculate Jupiter Gravity Assist Slingshot (> 51 km/s)</li>
+                <li><i data-lucide="list-ordered"></i> Order Flight Profile Phases into Chronological Sequence</li>
+                <li><i data-lucide="search"></i> Inspect Pioneer Golden Plaque (Pulsar Map)</li>
+              </ul>
+            </div>
+            <button id="btn-close-guide" class="solve-btn ready">GOT IT, LET'S EXPLORE!</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Puzzle Modal -->
       <div id="puzzle-modal" class="modal-backdrop hidden">
         <div class="puzzle-card">
@@ -125,7 +428,7 @@
               <h2 id="puzzle-title">PUZZLE TITLE</h2>
               <p id="puzzle-subtitle">Scientific task instructions</p>
             </div>
-            <button id="puzzle-close-btn" class="modal-close">✕</button>
+            <button id="puzzle-close-btn" class="modal-close"><i data-lucide="x"></i></button>
           </div>
           <div id="puzzle-body" class="puzzle-content">
             <!-- Dynamic puzzle UI injected here -->
@@ -141,7 +444,7 @@
               <h2>THE MEMORY VAULT</h2>
               <p>Recovered Physical Scientific Evidence from NASA Hardware</p>
             </div>
-            <button id="vault-close-btn" class="modal-close">✕</button>
+            <button id="vault-close-btn" class="modal-close"><i data-lucide="x"></i></button>
           </div>
           <div id="vault-clues-list" class="vault-body">
             <!-- Rendered by MemoryVault.js -->
@@ -149,55 +452,170 @@
         </div>
       </div>
 
-      <!-- Mission Select Modal -->
+      <!-- Interactive Solar System Mission Select Modal -->
       <div id="mission-select-modal" class="modal-backdrop hidden">
-        <div class="select-card">
+        <div class="select-card solar-modal-card">
           <div class="select-header">
-            <h2>SELECT RECOVERY MISSION</h2>
-            <p>Chronological NASA Exploration Hardware Archive</p>
-            <button id="mission-select-close" class="modal-close">✕</button>
+            <div>
+              <div class="solar-badge"><i data-lucide="orbit"></i> INTERACTIVE SOLAR SYSTEM ARCHIVE</div>
+              <h2>SELECT RECOVERY MISSION</h2>
+              <p>Explore interplanetary destinations along humanity's scientific trajectory</p>
+            </div>
+            <button id="mission-select-close" class="modal-close"><i data-lucide="x"></i></button>
           </div>
-          <div class="mission-grid-select">
-            <div class="mission-card-select" data-mission="mission-01">
-              <span class="m-num">MISSION 01</span>
-              <h4>FIRST SIGNAL</h4>
-              <p>Pioneer 10 // Jupiter Flyby & Solar Escape</p>
-              <span class="m-status">AVAILABLE</span>
+
+          <div class="solar-select-container">
+            <!-- 2D Interactive Solar System Canvas -->
+            <div class="solar-canvas-wrapper">
+              <canvas id="solar-system-canvas"></canvas>
+              <div class="solar-canvas-hint">
+                <i data-lucide="compass"></i> Click any planetary orbit or beacon to inspect mission data
+              </div>
             </div>
-            <div class="mission-card-select" data-mission="mission-02">
-              <span class="m-num">MISSION 02</span>
-              <h4>THE LUNAR ARCHIVE</h4>
-              <p>Apollo Lunar Module & LADEE // Moon</p>
-              <span class="m-status">AVAILABLE</span>
-            </div>
-            <div class="mission-card-select" data-mission="mission-04">
-              <span class="m-num">MISSION 04</span>
-              <h4>THE RED PLANET</h4>
-              <p>Viking, Opportunity & Ingenuity // Mars</p>
-              <span class="m-status">AVAILABLE</span>
+
+            <!-- Dynamic Mission Preview & Briefing Card -->
+            <div class="mission-briefing-panel">
+              <div class="briefing-header">
+                <span class="briefing-m-num" id="briefing-num">MISSION 01</span>
+                <span class="briefing-era" id="briefing-era">PIONEER ERA</span>
+              </div>
+              <h3 class="briefing-title" id="briefing-title">FIRST SIGNAL</h3>
+              <p class="briefing-target" id="briefing-target"><i data-lucide="map-pin"></i> Target: Jupiter & Deep Space</p>
+
+              <div class="briefing-specs">
+                <div class="spec-row">
+                  <span class="spec-label">HARDWARE:</span>
+                  <span class="spec-value" id="briefing-hardware">Pioneer 10 Interstellar Probe</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-label">RECOVERED:</span>
+                  <span class="spec-value highlight" id="briefing-clues">0 / 5 CLUES</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-label">OBJECTIVE:</span>
+                  <span class="spec-value desc" id="briefing-objective">Reconstruct lost deep-space telemetry carrier wave.</span>
+                </div>
+              </div>
+
+              <button id="btn-launch-selected-mission" class="solve-btn ready launch-btn">
+                <i data-lucide="rocket"></i> LAUNCH MISSION RECOVERY
+              </button>
             </div>
           </div>
+
+          <!-- Quick Navigation Mission Selector Pills -->
+          <div class="solar-quick-bar">
+            <span class="quick-bar-label"><i data-lucide="list"></i> QUICK SELECT:</span>
+            <div class="quick-pills">
+              <button class="quick-pill active" data-mission="mission-01">M01 // Pioneer 10 (Jupiter)</button>
+              <button class="quick-pill" data-mission="mission-02">M02 // Apollo 11 Eagle (Moon)</button>
+              <button class="quick-pill" data-mission="mission-03">M03 // Viking 1 Lander (Mars)</button>
+              <button class="quick-pill" data-mission="mission-04">M04 // Opportunity (Mars)</button>
+              <button class="quick-pill" data-mission="mission-05">M05 // Spitzer (IR Space)</button>
+              <button class="quick-pill" data-mission="mission-06">M06 // Dawn (Asteroids)</button>
+              <button class="quick-pill" data-mission="mission-07">M07 // Kepler (Exoplanets)</button>
+              <button class="quick-pill" data-mission="mission-08">M08 // LADEE (Moon Dust)</button>
+              <button class="quick-pill" data-mission="mission-09">M09 // Ingenuity (Mars Flight)</button>
+              <button class="quick-pill" data-mission="mission-10">M10 // Space Shuttle (LEO)</button>
+              <button id="btn-open-timeline-catalog" class="quick-pill timeline-pill">
+                <i data-lucide="book-marked"></i> NASA TIMELINE DIRECTORY (PDF ARCHIVE)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NASA Historical Chronological Timeline Directory Modal (100% PDF Coverage) -->
+      <div id="timeline-catalog-modal" class="modal-backdrop hidden">
+        <div class="timeline-catalog-card">
+          <div class="timeline-header">
+            <div>
+              <div class="solar-badge"><i data-lucide="book-marked"></i> GROUNDED IN NASA HISTORICAL RECORDS</div>
+              <h2>CHRONOLOGICAL TIMELINE OF NASA DISCARDED & RETIRED HARDWARE</h2>
+              <p>Complete historical inventory covering the 1960s to 2020s (from official NASA archive)</p>
+            </div>
+            <button id="timeline-catalog-close" class="modal-close-btn" aria-label="Close Archive"><i data-lucide="x"></i></button>
+          </div>
+
+          <!-- Era Filter Tabs -->
+          <div class="timeline-era-tabs">
+            <button class="era-tab active" data-era="all"><i data-lucide="layers"></i> All Eras</button>
+            <button class="era-tab" data-era="0"><i data-lucide="clock"></i> 1. Pioneer Era (1960–1969)</button>
+            <button class="era-tab" data-era="1"><i data-lucide="moon"></i> 2. Apollo & Deep Space (1970–1989)</button>
+            <button class="era-tab" data-era="2"><i data-lucide="compass"></i> 3. Red Planet & Asteroids (1990–2009)</button>
+            <button class="era-tab" data-era="3"><i data-lucide="rocket"></i> 4. Modern Era (2010–Present)</button>
+          </div>
+
+          <!-- Search Input -->
+          <div class="timeline-search-box">
+            <i data-lucide="search"></i>
+            <input type="text" id="timeline-search-input" placeholder="Search by hardware name, destination, or mission type (e.g. Apollo, Mars, Rover, Venus)..." />
+          </div>
+
+          <!-- List of Chronological Items -->
+          <div id="timeline-catalog-list" class="timeline-catalog-list"></div>
         </div>
       </div>
 
       <!-- Mission Debrief Modal -->
       <div id="debrief-modal" class="modal-backdrop hidden">
         <div class="debrief-card">
-          <div class="debrief-icon">★</div>
+          <div class="debrief-icon"><i data-lucide="award"></i></div>
           <h2 id="debrief-title">MISSION COMPLETE</h2>
           <div class="debrief-section">
-            <h4>HISTORICAL CONTEXT</h4>
+            <h4><i data-lucide="book-open"></i> HISTORICAL CONTEXT</h4>
             <p id="debrief-history"></p>
           </div>
           <div class="debrief-section">
-            <h4>SCIENTIFIC PRINCIPLE RECOVERED</h4>
+            <h4><i data-lucide="atom"></i> SCIENTIFIC PRINCIPLE RECOVERED</h4>
             <p id="debrief-science"></p>
           </div>
           <div class="debrief-score" id="debrief-score">
             SCORE: 100 PTS // RANK: FIELD SCIENTIST
           </div>
-          <button id="debrief-next-btn" class="solve-btn ready">CONTINUE TO NEXT MISSION ➔</button>
+          <button id="debrief-next-btn" class="solve-btn ready"><i data-lucide="rocket"></i> CONTINUE TO NEXT MISSION</button>
         </div>
+      </div>
+
+      <!-- Bottom-Right Interactive Companion: Mission Mischief -->
+      <div id="mission-mischief" class="mission-mischief-container">
+        <!-- Floating Speech Bubble -->
+        <div id="mischief-bubble" class="mischief-bubble hidden">
+          <div class="mischief-bubble-header">
+            <span class="mischief-tag" id="mischief-type-tag">
+              <i data-lucide="radio"></i> TELEMETRY
+            </span>
+            <span class="mischief-time"><i data-lucide="activity"></i> LIVE</span>
+          </div>
+          <div class="mischief-bubble-body" id="mischief-message-text">
+            Carrier wave locked at 2.29 GHz S-Band.
+          </div>
+          <div class="mischief-bubble-tail"></div>
+        </div>
+
+        <!-- Companion Avatar Button -->
+        <button id="mischief-avatar-btn" class="mischief-avatar-btn" title="Click Mission Mischief for instant recon tips!" aria-label="Mission Mischief Companion">
+          <div class="mischief-avatar-inner">
+            <i data-lucide="bot"></i>
+            <span class="mischief-status-dot"></span>
+          </div>
+          <div class="mischief-label-pill">
+            <span class="mischief-name">MISCHIEF</span>
+            <span class="mischief-role">MISSION COMPANION</span>
+          </div>
+        </button>
+      </div>
+    <!-- Mobile Portrait Orientation Warning Prompt -->
+    <div id="portrait-orientation-warning" class="portrait-warning hidden">
+      <div class="warning-card">
+        <div class="rotate-phone-anim">
+          <i data-lucide="smartphone"></i>
+        </div>
+        <h3>PLEASE ROTATE DEVICE TO LANDSCAPE</h3>
+        <p>For the best NASA mission experience, Space Shuttle flight simulation, and Solar System exploration, please hold your phone in landscape mode.</p>
+        <button id="btn-dismiss-orientation-warning" class="warning-dismiss-btn">
+          <i data-lucide="check"></i> CONTINUE IN LANDSCAPE
+        </button>
       </div>
     </div>
 

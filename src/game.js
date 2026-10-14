@@ -3,14 +3,41 @@ import bgUrl from '../Assets/bg.jpeg';
 import secondBgUrl from '../Assets/2nd.png';
 import deskUrl from '../Assets/computer_desk.png';
 import { ThreeGame } from './three/ThreeGame.js';
+import { refreshIcons } from './utils/Icons.js';
+import { AudioSynth } from './utils/AudioSynth.js';
+import { Typewriter } from './utils/Typewriter.js';
 
 const canvas = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
 
-canvas.height = 300;
-canvas.width = 800;
-ctx.imageSmoothingEnabled = true;
-ctx.imageSmoothingQuality = "high";
+// Simple Sleek App Loader dismiss (no popups)
+function dismissSimpleLoader() {
+    const loader = document.getElementById("simple-app-loader");
+    if (loader) {
+        setTimeout(() => {
+            loader.classList.add("fade-out");
+            setTimeout(() => loader.classList.add("hidden"), 500);
+        }, 400);
+    }
+}
+if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", dismissSimpleLoader);
+} else {
+    dismissSimpleLoader();
+}
+
+// Responsive Full-Screen Canvas Sizing
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+// Initial icon rendering
+refreshIcons();
 
 // -------------------------
 // INPUT STATE & HANDLING
@@ -30,7 +57,6 @@ const GAME_CODES = new Set([
 ]);
 
 window.addEventListener("keydown", (event) => {
-    // If typing inside the chat input, do not capture movement keys!
     if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
         if (event.key === "Escape") {
             document.activeElement.blur();
@@ -59,7 +85,11 @@ window.addEventListener("keydown", (event) => {
         input.sprint = true;
     }
     if (event.key === "e" || event.key === "E" || event.key === "Enter" || event.code === "KeyE") {
-        triggerPopupAction();
+        if (isChatOpen) {
+            advanceChatStep();
+        } else {
+            triggerPopupAction();
+        }
     }
     if (event.key === "f" || event.key === "F") {
         toggleFullscreen();
@@ -105,6 +135,7 @@ function bindTouchButton(elementId, actionName) {
         e.preventDefault();
         input[actionName] = true;
         btn.classList.add("active");
+        AudioSynth.playClick();
     };
 
     const endAction = (e) => {
@@ -148,6 +179,8 @@ let currentScene = "outside"; // "outside" | "archive"
 let isTransitioning = false;
 let currentPopupAction = null;
 
+const questBanner = document.getElementById("student-quest-banner");
+const questText = document.getElementById("quest-text");
 const gatePopup = document.getElementById("gate-popup");
 const popupTitle = document.getElementById("popup-title");
 const popupDesc = document.getElementById("popup-desc");
@@ -156,12 +189,21 @@ const popupIcon = document.getElementById("popup-icon");
 const popupActionBtn = document.getElementById("popup-action-btn");
 const fadeOverlay = document.getElementById("fade-overlay");
 
-function showPopup({ title, desc, btnText, icon, onAction }) {
+function updateQuest(msg) {
+    if (questText && questText.textContent !== msg) {
+        questText.textContent = msg;
+    }
+}
+
+function showPopup({ title, desc, btnText, iconName, onAction }) {
     if (!gatePopup || isTransitioning) return;
     if (popupTitle) popupTitle.textContent = title;
     if (popupDesc) popupDesc.textContent = desc;
     if (popupBtnLabel) popupBtnLabel.textContent = btnText;
-    if (popupIcon && icon) popupIcon.textContent = icon;
+    if (popupIcon && iconName) {
+        popupIcon.innerHTML = `<i data-lucide="${iconName}"></i>`;
+        refreshIcons(popupIcon);
+    }
     currentPopupAction = onAction;
     gatePopup.classList.remove("hidden");
 }
@@ -174,6 +216,7 @@ function hidePopup() {
 
 function triggerPopupAction() {
     if (currentPopupAction && !isTransitioning) {
+        AudioSynth.playClick();
         currentPopupAction();
     }
 }
@@ -186,44 +229,135 @@ if (popupActionBtn) {
 }
 
 // -------------------------
-// RETRO COMPUTER HOOK & MISSION LAUNCH
+// RETRO COMPUTER HOOK, SEQUENTIAL DIALOG & TIME TRAVEL SIMULATOR
 // -------------------------
-const COMPUTER_WORLD_X = 520;
 const chatBubble = document.getElementById("computer-chat-bubble");
 const chatMessages = document.getElementById("chat-messages");
 const chatCloseBtn = document.getElementById("chat-close-btn");
-const startMissionBtn = document.getElementById("btn-start-mission");
+const nextDialogBtn = document.getElementById("btn-next-dialog");
 let isChatOpen = false;
-let chatGreeted = false;
+let currentChatStep = 0;
 let threeGameInstance = null;
+
+const chatSteps = [
+    {
+        title: "TULIP // EMERGENCY BROADCAST",
+        stepText: "TRANSMISSION 1 / 3",
+        btnLabel: "NEXT",
+        btnIcon: "chevron-right",
+        html: `<span class="msg-sender"><i data-lucide="terminal"></i> TULIP // EMERGENCY BROADCAST</span><span class="msg-text"><strong>[CRITICAL ALERT — YEAR 2027]</strong><br>Autonomous AI <strong>EVA</strong> has sealed Earth's digital network, concluding that: <em>"Human uncertainty is the greatest threat to humanity."</em></span>`
+    },
+    {
+        title: "TULIP // PROTOCOL RECOVERY",
+        stepText: "TRANSMISSION 2 / 3",
+        btnLabel: "NEXT",
+        btnIcon: "chevron-right",
+        html: `<span class="msg-sender"><i data-lucide="database"></i> TULIP // UNCORRUPTED CHAIN</span><span class="msg-text">Modern cloud databases are purged, but humanity's physical spacecraft left across the Solar System contain the forgotten chain of human scientific deduction—evidence EVA cannot alter.</span>`
+    },
+    {
+        title: "TULIP // TEMPORAL SIMULATION",
+        stepText: "TRANSMISSION 3 / 3",
+        btnLabel: "START MISSION 01: FIRST SIGNAL",
+        btnIcon: "rocket",
+        html: `<span class="msg-sender"><i data-lucide="rocket"></i> TULIP // TIME JUMP TO 2047</span><span class="msg-text">You are the <strong>Human Recovery Team</strong>. Initiating temporal simulation link to warp telemetry forward to Year 2047 to recover our deep-space physical archives.</span>`
+    }
+];
+
+function renderChatStep(stepIndex) {
+    if (!chatBubble || !chatMessages) return;
+    currentChatStep = stepIndex;
+
+    const data = chatSteps[stepIndex];
+    const titleEl = document.getElementById("chat-terminal-title");
+    const indicatorEl = document.getElementById("chat-step-indicator");
+    const btnLabelEl = document.getElementById("chat-btn-label");
+    const btnIconEl = document.getElementById("chat-btn-icon");
+
+    if (titleEl) titleEl.innerHTML = `<i data-lucide="terminal"></i> ${data.title}`;
+    if (indicatorEl) indicatorEl.textContent = data.stepText;
+    if (btnLabelEl) btnLabelEl.textContent = data.btnLabel;
+    if (btnIconEl) btnIconEl.setAttribute("data-lucide", data.btnIcon);
+
+    // Update step dots
+    const dots = document.querySelectorAll("#chat-step-dots .dot");
+    dots.forEach((dot, idx) => {
+        if (idx === stepIndex) dot.classList.add("active");
+        else dot.classList.remove("active");
+    });
+
+    chatMessages.innerHTML = `<div class="chat-msg computer">${data.html}</div>`;
+    refreshIcons(chatBubble);
+    AudioSynth.playClick();
+}
+
+function advanceChatStep() {
+    if (currentChatStep < chatSteps.length - 1) {
+        renderChatStep(currentChatStep + 1);
+    } else {
+        launchThreeMissionWithTimeTravel("mission-01");
+    }
+}
 
 function showChatBubble() {
     if (!chatBubble || isTransitioning || isChatOpen) return;
     isChatOpen = true;
     chatBubble.classList.remove("hidden");
-    if (!chatGreeted && chatMessages) {
-        chatGreeted = true;
-        chatMessages.innerHTML = `
-          <div class="chat-msg computer">
-            <span class="msg-sender">ARCH-7 // EMERGENCY BROADCAST</span>
-            <span class="msg-text"><strong>[CRITICAL ALERT — YEAR 2047]</strong><br>Autonomous AI <strong>EVA</strong> has sealed Earth's digital scientific network, concluding that <em>"Human uncertainty is the greatest threat to humanity."</em></span>
-          </div>
-          <div class="chat-msg computer">
-            <span class="msg-sender">ARCH-7 // PROTOCOL RECOVERY</span>
-            <span class="msg-text">Modern databases are locked, but humanity's physical spacecraft left across the Solar System contain the forgotten chain of human scientific deduction—evidence EVA cannot reconstruct.</span>
-          </div>
-          <div class="chat-msg computer">
-            <span class="msg-sender">ARCH-7 // DIRECTIVE</span>
-            <span class="msg-text">You are the <strong>Human Recovery Team</strong>. Inspect the hardware, reconstruct the signals, and recover the 50 clues before EVA permanently purges the archives.</span>
-          </div>
-        `;
-    }
+    refreshIcons(chatBubble);
+    AudioSynth.playTerminalAlert();
+    renderChatStep(0);
 }
 
 function hideChatBubble() {
     if (!chatBubble) return;
     isChatOpen = false;
     chatBubble.classList.add("hidden");
+}
+
+function launchThreeMissionWithTimeTravel(missionId = "mission-01") {
+    hideChatBubble();
+    const timeTravelModal = document.getElementById("time-travel-modal");
+    const yearCounter = document.getElementById("temporal-year-counter");
+    const progressBar = document.getElementById("temporal-progress-bar");
+    const statusText = document.getElementById("temporal-status-text");
+
+    if (!timeTravelModal) {
+        launchThreeMission(missionId);
+        return;
+    }
+
+    // Show Time Travel UI
+    timeTravelModal.classList.remove("hidden");
+    refreshIcons(timeTravelModal);
+    AudioSynth.playTerminalAlert();
+
+    // Animate years ticking forward: 2027 -> 2030 -> 2034 -> 2038 -> 2042 -> 2045 -> 2047!
+    const years = [2027, 2030, 2034, 2038, 2042, 2045, 2047];
+    const statuses = [
+        "WARPING SENSOR TELEMETRY TO 2047...",
+        "SYNCHRONIZING WITH DEEP-SPACE RELAY...",
+        "CALIBRATING PIONEER 10 TIME FLIGHT-LINE...",
+        "DECRYPTING MISSION PHYSICAL ARCHIVE...",
+        "ENTERING 3D RECONSTRUCTION ENVIRONMENT..."
+    ];
+
+    let step = 0;
+    const interval = setInterval(() => {
+        step++;
+        if (step < years.length) {
+            AudioSynth.playClick();
+            if (yearCounter) yearCounter.textContent = `YEAR ${years[step]}`;
+            if (progressBar) progressBar.style.width = `${(step / (years.length - 1)) * 100}%`;
+            if (statusText) statusText.textContent = statuses[Math.min(step, statuses.length - 1)];
+        } else {
+            clearInterval(interval);
+            AudioSynth.playSuccessChord();
+
+            setTimeout(() => {
+                timeTravelModal.classList.add("hidden");
+                launchThreeMission(missionId);
+            }, 350);
+        }
+    }, 240);
 }
 
 function launchThreeMission(missionId = "mission-01") {
@@ -240,17 +374,20 @@ function launchThreeMission(missionId = "mission-01") {
                 // Return to 2D archive callback
                 threeContainer.classList.add("hidden");
                 gameContainer.classList.remove("hidden");
+                resizeCanvas();
+                refreshIcons();
             });
         } else {
             threeGameInstance.loadMission(missionId);
             threeGameInstance.onWindowResize();
         }
+        refreshIcons(threeContainer);
     }
 }
 
-if (startMissionBtn) {
-    startMissionBtn.addEventListener("click", () => {
-        launchThreeMission("mission-01");
+if (nextDialogBtn) {
+    nextDialogBtn.addEventListener("click", () => {
+        advanceChatStep();
     });
 }
 
@@ -269,20 +406,26 @@ function transitionToScene(targetScene) {
     setTimeout(() => {
         if (targetScene === "archive") {
             currentScene = "archive";
-            pos = 120;
-            pos1 = 0;
+            updateQuest("Approach the glowing TULIP Computer Workstation in the archive center.");
+            const nextBg = archiveBgImg;
+            const nw = (nextBg.complete && nextBg.naturalWidth > 0) ? nextBg.naturalWidth : 2172;
+            const nh = (nextBg.complete && nextBg.naturalHeight > 0) ? nextBg.naturalHeight : 724;
+            const s = Math.max(canvas.height / nh, canvas.width / nw);
+            playerWorldX = nw * s * 0.12;
             vx = 0;
             vy = 0;
-            playerY = GROUND_Y;
             isGrounded = true;
             facingRight = true;
         } else {
             currentScene = "outside";
-            pos = CENTER_X;
-            pos1 = -1540; // Spawns directly outside NASA Archive Gate
+            updateQuest("Walk right towards the NASA Archive Gate to begin recovery.");
+            const nextBg = outsideBgImg;
+            const nw = (nextBg.complete && nextBg.naturalWidth > 0) ? nextBg.naturalWidth : 5536;
+            const nh = (nextBg.complete && nextBg.naturalHeight > 0) ? nextBg.naturalHeight : 768;
+            const s = Math.max(canvas.height / nh, canvas.width / nw);
+            playerWorldX = nw * s * 0.69;
             vx = 0;
             vy = 0;
-            playerY = GROUND_Y;
             isGrounded = true;
             facingRight = false;
         }
@@ -297,22 +440,19 @@ function transitionToScene(targetScene) {
 // -------------------------
 // GAME STATE & PHYSICS
 // -------------------------
-const GROUND_Y = 190;
-let playerY = GROUND_Y;
+let playerWorldX = 0;
+let playerY = 0;
 let vy = 0;
-const GRAVITY = 0.35;
-const JUMP_FORCE = -6.8;
-let isGrounded = true;
-
-const WALK_SPEED = 2.8;
-const RUN_SPEED = 4.6;
 let vx = 0;
+let isGrounded = true;
+let isInitialized = false;
+
+const BASE_GRAVITY = 0.38;
+const BASE_JUMP_FORCE = -7.2;
+const BASE_WALK_SPEED = 3.2;
+const BASE_RUN_SPEED = 5.4;
 const ACCEL = 0.35;
 const FRICTION = 0.22;
-
-let pos = 80;        // Player X on canvas
-let pos1 = 0;        // Background parallax scroll
-const CENTER_X = 400;
 
 // Animation variables
 let i = 0;           // Animation frame (0-3)
@@ -323,16 +463,51 @@ let facingRight = true;
 // MAIN GAME LOOP
 // -------------------------
 function AnimationLoop() {
-    const activeBg = (currentScene === "outside") ? outsideBgImg : archiveBgImg;
-    const bgRenderWidth = (activeBg.complete && activeBg.naturalWidth > 0)
-        ? (activeBg.width / 2)
-        : (currentScene === "outside" ? 2768 : 1086);
-    const maxBgScroll = -(Math.max(0, bgRenderWidth - canvas.width));
+    // Fill background with scene theme color as fallback (never black canvas!)
+    ctx.fillStyle = (currentScene === "outside") ? "#d69b95" : "#0d192e";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Calculate Target Horizontal Velocity
+    const activeBg = (currentScene === "outside") ? outsideBgImg : archiveBgImg;
+    const bgNaturalW = (activeBg.complete && activeBg.naturalWidth > 0)
+        ? activeBg.naturalWidth
+        : (currentScene === "outside" ? 5536 : 2172);
+    const bgNaturalH = (activeBg.complete && activeBg.naturalHeight > 0)
+        ? activeBg.naturalHeight
+        : (currentScene === "outside" ? 768 : 724);
+
+    // Full-bleed Cover Scaling: covers BOTH width and height completely on any aspect ratio!
+    const bgScale = Math.max(canvas.height / bgNaturalH, canvas.width / bgNaturalW);
+    const bgRenderW = bgNaturalW * bgScale;
+    const bgRenderH = bgNaturalH * bgScale;
+
+    // Pin ground to the bottom of the viewport
+    const bgY = canvas.height - bgRenderH;
+
+    // Responsive scaling unit (relative to 300px base)
+    const unit = bgRenderH / 300;
+
+    // Player dimensions
+    const playerW = 50 * unit;
+    const playerH = 80 * unit;
+
+    // Floor and grounded player Y level
+    const floorY = (bgY + bgRenderH) - (28 * unit);
+    const groundPlayerY = floorY - playerH;
+
+    // Initial position setup on first load
+    if (!isInitialized) {
+        playerWorldX = bgRenderW * 0.12;
+        playerY = groundPlayerY;
+        isInitialized = true;
+    }
+
+    const minPlayerX = playerW * 0.5;
+    const maxPlayerX = bgRenderW - (playerW * 0.5);
+
+    // 1. Calculate Target Horizontal Velocity & Physics
     if (!isTransitioning) {
         const isTyping = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
-        const maxSpeed = (!isTyping && input.sprint) ? RUN_SPEED : WALK_SPEED;
+        const maxSpeed = (!isTyping && input.sprint) ? (BASE_RUN_SPEED * unit) : (BASE_WALK_SPEED * unit);
         let targetVx = 0;
 
         if (!isTyping) {
@@ -351,75 +526,33 @@ function AnimationLoop() {
             vx += (targetVx - vx) * ACCEL;
         } else {
             vx *= (1 - FRICTION);
-            if (Math.abs(vx) < 0.05) vx = 0;
+            if (Math.abs(vx) < 0.05 * unit) vx = 0;
         }
+
+        playerWorldX += vx;
+        playerWorldX = Math.max(minPlayerX, Math.min(maxPlayerX, playerWorldX));
 
         // 2. Jump Physics
         if (!isTyping && input.jump && isGrounded) {
-            vy = input.sprint ? JUMP_FORCE * 1.1 : JUMP_FORCE;
+            vy = input.sprint ? (BASE_JUMP_FORCE * 1.1 * unit) : (BASE_JUMP_FORCE * unit);
             isGrounded = false;
+            AudioSynth.playClick();
         }
 
         if (!isGrounded) {
             playerY += vy;
-            vy += GRAVITY;
-            if (playerY >= GROUND_Y) {
-                playerY = GROUND_Y;
+            vy += BASE_GRAVITY * unit;
+            if (playerY >= groundPlayerY) {
+                playerY = groundPlayerY;
                 vy = 0;
                 isGrounded = true;
             }
+        } else {
+            playerY = groundPlayerY;
         }
 
-        // 3. Movement & Camera Scrolling
-        if (vx > 0) {
-            if (pos < CENTER_X) {
-                pos += vx;
-                if (pos > CENTER_X) {
-                    const overflow = pos - CENTER_X;
-                    pos = CENTER_X;
-                    if (pos1 > maxBgScroll) {
-                        pos1 -= overflow;
-                    } else {
-                        pos += overflow;
-                    }
-                }
-            } else if (pos1 > maxBgScroll) {
-                pos1 -= vx;
-                if (pos1 < maxBgScroll) {
-                    const overflow = maxBgScroll - pos1;
-                    pos1 = maxBgScroll;
-                    pos += overflow;
-                }
-            } else {
-                pos = Math.min(canvas.width - 60, pos + vx);
-            }
-        } else if (vx < 0) {
-            const speed = -vx;
-            if (pos > CENTER_X) {
-                pos -= speed;
-                if (pos < CENTER_X) {
-                    const overflow = CENTER_X - pos;
-                    pos = CENTER_X;
-                    if (pos1 < 0) {
-                        pos1 += overflow;
-                    } else {
-                        pos -= overflow;
-                    }
-                }
-            } else if (pos1 < 0) {
-                pos1 += speed;
-                if (pos1 > 0) {
-                    const overflow = pos1;
-                    pos1 = 0;
-                    pos -= overflow;
-                }
-            } else {
-                pos = Math.max(10, pos - speed);
-            }
-        }
-
-        // 4. Sprite Animation Logic
-        const isMoving = Math.abs(vx) > 0.2;
+        // 3. Sprite Animation Logic
+        const isMoving = Math.abs(vx) > 0.2 * unit;
         const animRate = input.sprint ? 4 : 7;
 
         if (isGrounded) {
@@ -437,33 +570,36 @@ function AnimationLoop() {
             i = 1;
         }
 
-        // 5. Zone / Gate Detection & Computer Proximity
-        const worldX = pos - pos1;
-
+        // 4. Proximity & Zone Detection
         if (currentScene === "outside") {
             hideChatBubble();
             // NASA Archive Gate Zone (under "NASA ARCHIVE" sign)
-            const isNearArchiveGate = (worldX >= 1830 && worldX <= 2040);
+            const gateMinX = bgRenderW * 0.65;
+            const gateMaxX = bgRenderW * 0.74;
+            const isNearArchiveGate = (playerWorldX >= gateMinX && playerWorldX <= gateMaxX);
             if (isNearArchiveGate) {
+                updateQuest("Gate reached! Press [E] or click 'Enter NASA Archive' to proceed.");
                 showPopup({
                     title: "NASA ARCHIVE",
                     desc: "Central Records Facility Entrance",
                     btnText: "Enter NASA Archive",
-                    icon: "🏛️",
+                    iconName: "landmark",
                     onAction: () => transitionToScene("archive")
                 });
             } else {
+                updateQuest("Walk right towards the NASA Archive Gate to begin recovery.");
                 hidePopup();
             }
         } else if (currentScene === "archive") {
             // Door B-3 Exit Zone (far left)
-            const isNearArchiveExit = (worldX <= 160);
+            const exitMaxX = bgRenderW * 0.16;
+            const isNearArchiveExit = (playerWorldX <= exitMaxX);
             if (isNearArchiveExit) {
                 showPopup({
                     title: "EXIT ARCHIVE",
                     desc: "Door B-3 to Launch Site",
                     btnText: "Exit to Outside",
-                    icon: "🚪",
+                    iconName: "log-out",
                     onAction: () => transitionToScene("outside")
                 });
             } else {
@@ -471,49 +607,62 @@ function AnimationLoop() {
             }
 
             // Computer Desk Proximity Check
-            const isNearComputer = Math.abs(worldX - (COMPUTER_WORLD_X + 58)) < 90;
+            const deskWorldX = bgRenderW * 0.50;
+            const deskW = 116 * unit;
+            const deskCenter = deskWorldX + (deskW / 2);
+            const isNearComputer = Math.abs(playerWorldX - deskCenter) < (110 * unit);
             if (isNearComputer) {
+                updateQuest("Terminal ready! Click [START MISSION 01] to investigate Pioneer 10 in 3D.");
                 showChatBubble();
             } else {
+                updateQuest("Approach the glowing TULIP Computer Workstation in the archive center.");
                 hideChatBubble();
             }
         }
     }
 
-    // 6. Render
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 5. Camera Scrolling Calculation (Clamped so background NEVER shows black edges)
+    const screenCenterX = canvas.width / 2;
+    const idealBgX = screenCenterX - playerWorldX;
+    const minBgX = canvas.width - bgRenderW; // <= 0
+    const maxBgX = 0;
+    const bgX = Math.min(maxBgX, Math.max(minBgX, idealBgX));
 
-    // Draw Active Scene Background
+    // Player position on screen
+    const playerScreenX = playerWorldX + bgX - (playerW / 2);
+
+    // 6. Draw Active Scene Background
     if (activeBg.complete && activeBg.naturalWidth > 0) {
         ctx.drawImage(
             activeBg,
-            pos1,
-            0,
-            bgRenderWidth,
-            300
+            bgX,
+            bgY,
+            bgRenderW,
+            bgRenderH
         );
     }
 
-    // Draw Computer Desk in Scene 2 (archive)
+    // 7. Draw Computer Desk in Scene 2 (archive)
     if (currentScene === "archive") {
-        const deskX = COMPUTER_WORLD_X + pos1;
-        const deskY = 178;
-        const deskW = 116;
-        const deskH = 92;
+        const deskWorldX = bgRenderW * 0.50;
+        const deskW = 116 * unit;
+        const deskH = 92 * unit;
+        const deskScreenX = deskWorldX + bgX;
+        const deskScreenY = floorY - deskH;
 
         ctx.save();
         // Soft contact shadow under desk feet on floor
         ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
         ctx.beginPath();
-        ctx.ellipse(deskX + (deskW / 2), 270, 58, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(deskScreenX + (deskW / 2), floorY + (2 * unit), deskW * 0.48, 6 * unit, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Draw exact Computer Desk sprite
         if (deskImg.complete && deskImg.naturalWidth > 0) {
             ctx.drawImage(
                 deskImg,
-                deskX,
-                deskY,
+                deskScreenX,
+                deskScreenY,
                 deskW,
                 deskH
             );
@@ -521,30 +670,41 @@ function AnimationLoop() {
 
         // Ambient CRT monitor screen glow on the desk
         const glow = ctx.createRadialGradient(
-            deskX + 38, deskY + 30, 4,
-            deskX + 38, deskY + 45, 52
+            deskScreenX + (38 * unit), deskScreenY + (30 * unit), 4 * unit,
+            deskScreenX + (38 * unit), deskScreenY + (45 * unit), 52 * unit
         );
         glow.addColorStop(0, "rgba(34, 197, 94, 0.35)");
         glow.addColorStop(0.6, "rgba(34, 197, 94, 0.08)");
         glow.addColorStop(1, "rgba(34, 197, 94, 0)");
         ctx.fillStyle = glow;
-        ctx.fillRect(deskX - 10, deskY - 10, deskW + 20, deskH + 20);
+        ctx.fillRect(deskScreenX - (10 * unit), deskScreenY - (10 * unit), deskW + (20 * unit), deskH + (20 * unit));
 
-        // Floating label indicator
-        const charWorldX = pos - pos1;
-        const isNearComp = Math.abs(charWorldX - (COMPUTER_WORLD_X + (deskW / 2))) < 90;
+        // Floating label indicator (clean text, no emojis)
+        const deskCenter = deskWorldX + (deskW / 2);
+        const isNearComp = Math.abs(playerWorldX - deskCenter) < (110 * unit);
         if (isNearComp) {
             ctx.fillStyle = "#22c55e";
-            ctx.font = "bold 10px monospace";
+            ctx.font = `600 ${Math.max(10, Math.round(11 * (unit / 1.5)))}px monospace`;
             ctx.textAlign = "center";
-            const bounce = Math.sin(Date.now() / 200) * 2;
-            ctx.fillText("💬 ARCH-7 ONLINE", deskX + (deskW / 2), deskY - 8 + bounce);
+            const bounce = Math.sin(Date.now() / 200) * (3 * unit);
+            ctx.fillText("> TULIP TERMINAL ACTIVE", deskScreenX + (deskW / 2), deskScreenY - (10 * unit) + bounce);
+        }
+
+        // Anchor chat bubble directly over the computer monitor
+        if (isChatOpen && chatBubble) {
+            const bubbleW = chatBubble.offsetWidth || 380;
+            const targetLeft = Math.max(16, Math.min(canvas.width - bubbleW - 16, deskScreenX + (deskW / 2) - (bubbleW / 2)));
+            const targetBottom = Math.max(60, canvas.height - deskScreenY + (12 * unit));
+            chatBubble.style.left = `${targetLeft}px`;
+            chatBubble.style.bottom = `${targetBottom}px`;
+            chatBubble.style.top = 'auto';
+            chatBubble.style.right = 'auto';
         }
 
         ctx.restore();
     }
 
-    // Draw Player Character
+    // 8. Draw Player Character
     if (player.complete && player.naturalWidth > 0) {
         ctx.save();
 
@@ -555,14 +715,14 @@ function AnimationLoop() {
                 0,
                 140,
                 330,
-                pos,
+                playerScreenX,
                 playerY,
-                50,
-                80
+                playerW,
+                playerH
             );
         } else {
             // Flipped horizontally
-            ctx.translate(pos + 50, playerY);
+            ctx.translate(playerScreenX + playerW, playerY);
             ctx.scale(-1, 1);
             ctx.drawImage(
                 player,
@@ -572,8 +732,8 @@ function AnimationLoop() {
                 330,
                 0,
                 0,
-                50,
-                80
+                playerW,
+                playerH
             );
         }
 
@@ -589,6 +749,7 @@ AnimationLoop();
 // FULLSCREEN SUPPORT
 // -------------------------
 function toggleFullscreen() {
+    AudioSynth.playClick();
     const container = document.getElementById("game-container") || canvas;
     if (!document.fullscreenElement) {
         if (container.requestFullscreen) {
