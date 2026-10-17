@@ -1,0 +1,41 @@
+{
+  "debug": true,
+  "levels": [
+    {
+      "id": 1,
+      "name": "Level 1",
+      "bg": { "image": "bg.jpeg", "widthCoef": 0.5 },
+      "avatar": {
+        "image": "avatar.png",
+        "frameW": 345,
+        "frameH": 780,
+        "startX": 0,
+        "y": 175,
+        "drawW": 70,
+        "drawH": 100,
+        "frames": 5,
+        "animSpeed": 20,
+        "idleFrame": 5,
+        "speed": 1,
+        "stopX": 400,
+        "jumpHeight": 170,
+        "hitbox": { "xMin": 10, "xMax": 60, "yMin": 5, "yMax": 100 }
+      },
+      "objects": [],
+      "enemies": [
+        {
+          "image": "enime1.png",
+          "frameW": 218,
+          "frameH": 280,
+          "worldX": 600,
+          "y": 215,
+          "drawW": 50,
+          "drawH": 60,
+          "frames": 6,
+          "animSpeed": 10,
+          "hitbox": { "xMin": 5, "xMax": 45, "yMin": 5, "yMax": 60 }
+        }
+      ]
+    }
+  ]
+}
