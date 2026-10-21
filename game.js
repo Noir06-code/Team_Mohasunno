@@ -1,10 +1,22 @@
-const canvas = document.getElementById("myCanvas");
-const ctx = canvas.getContext("2d");
+import levelData from "./levels.json";
 
-canvas.height = 300;
-canvas.width = 800;
+const assetModules = import.meta.glob("./Assets/*", {
+    import: "default",
+    query: "?url"
+});
 
-const ASSETS = "./Assets/";
+const ASSETS = Object.fromEntries(
+    Object.entries(assetModules).map(([path, url]) => [path.split("/").pop(), url])
+);
+
+export function mountGame(canvas) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+        throw new Error("Unable to create a 2D canvas context");
+    }
+
+    canvas.height = 300;
+    canvas.width = 800;
 
 // show hitboxes (set from levels.json "debug", toggle with the H key)
 let debug = false;
@@ -13,12 +25,16 @@ let debug = false;
 // HELPERS
 // ---------------------------------------------------------------
 function loadImage(src) {
-    return new Promise((resolve, reject) => {
+    if (typeof src !== "function") {
+        return Promise.reject(new Error("Game image asset was not found"));
+    }
+
+    return src().then((assetUrl) => new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error("Failed to load image: " + src));
-        img.src = src;
-    });
+        img.onerror = () => reject(new Error("Failed to load image: " + assetUrl));
+        img.src = assetUrl;
+    }));
 }
 
 // Hitbox = a rectangle inside the drawn image, measured from the image's
@@ -56,14 +72,17 @@ const keys = {
     ArrowRight: false
 };
 
-window.addEventListener("keydown", (e) => {
+const handleKeyDown = (e) => {
     if (e.key in keys) keys[e.key] = true;
     if (e.key === "h" || e.key === "H") debug = !debug;
-});
+};
 
-window.addEventListener("keyup", (e) => {
+const handleKeyUp = (e) => {
     if (e.key in keys) keys[e.key] = false;
-});
+};
+
+window.addEventListener("keydown", handleKeyDown);
+window.addEventListener("keyup", handleKeyUp);
 
 
 // ---------------------------------------------------------------
@@ -77,7 +96,7 @@ class Background {
         this.img = null;
         this.widthCoef = widthCoef;
         this.scrollX = 0;   // how far the background has moved (0 or negative)
-        this.ready = loadImage(ASSETS + imageName).then((img) => {
+        this.ready = loadImage(ASSETS[imageName]).then((img) => {
             this.img = img;
         });
     }
@@ -141,7 +160,7 @@ class Enemy {
         this.frame = 0;
         this.timer = 0;
 
-        this.ready = loadImage(ASSETS + cfg.image).then((img) => {
+        this.ready = loadImage(ASSETS[cfg.image]).then((img) => {
             this.img = img;
         });
     }
@@ -204,7 +223,7 @@ class GameObject {
         this.solid = cfg.solid ?? true;
         this.hb = null;
 
-        this.ready = loadImage(ASSETS + cfg.image).then((img) => {
+        this.ready = loadImage(ASSETS[cfg.image]).then((img) => {
             this.img = img;
 
             // fill in the size once the image is known
@@ -298,7 +317,7 @@ class Avatar {
         this.facingRight = true;
         this.jump = 0;      // current jump height (counts down)
 
-        this.ready = loadImage(ASSETS + this.image).then((img) => {
+        this.ready = loadImage(ASSETS[this.image]).then((img) => {
             this.img = img;
         });
     }
@@ -433,6 +452,14 @@ let enemies = [];
 let objects = [];
 let loading = true;
 let errorMessage = "";
+let stopped = false;
+let animationFrameId = null;
+
+function scheduleAnimationFrame() {
+    if (!stopped) {
+        animationFrameId = requestAnimationFrame(AnimationLoop);
+    }
+}
 
 async function loadLevel(index) {
     loading = true;
@@ -468,16 +495,13 @@ function showError(err) {
 
 async function init() {
     try {
-        const res = await fetch("./levels.json");
-        if (!res.ok) throw new Error("levels.json: HTTP " + res.status);
-        const data = await res.json();
-        levels = data.levels;
-        debug = data.debug ?? false;
+        levels = levelData.levels;
+        debug = levelData.debug ?? false;
         await loadLevel(0);
     } catch (err) {
         showError(err);
     }
-    AnimationLoop();
+    scheduleAnimationFrame();
 }
 
 
@@ -508,7 +532,7 @@ function AnimationLoop() {
 
     if (loading) {
         drawMessage("Loading...");
-        requestAnimationFrame(AnimationLoop);
+        scheduleAnimationFrame();
         return;
     }
 
@@ -520,7 +544,7 @@ function AnimationLoop() {
     const avatarRect = avatar.getRect();
     if (enemies.some((e) => overlaps(avatarRect, e.getRect(bg)))) {
         loadLevel(currentLevel).catch(showError);
-        requestAnimationFrame(AnimationLoop);
+        scheduleAnimationFrame();
         return;
     }
 
@@ -539,7 +563,17 @@ function AnimationLoop() {
         loadLevel(currentLevel + 1).catch(showError);
     }
 
-    requestAnimationFrame(AnimationLoop);
+    scheduleAnimationFrame();
 }
 
 init();
+
+return () => {
+    stopped = true;
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+    }
+    window.removeEventListener("keydown", handleKeyDown);
+    window.removeEventListener("keyup", handleKeyUp);
+};
+}
