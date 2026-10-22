@@ -413,7 +413,7 @@ export class PuzzleManager {
             <i data-lucide="help-circle"></i>
             <strong>STUDENT FIELD GUIDE // MISSION PLANNING:</strong>
           </div>
-          <p>Every space mission follows a chronological chain of events. Click any two cards below to swap their positions until the timeline starts with <em>Launch</em> and finishes with <em>Primary Science Cruise / Mission Objective</em>!</p>
+          <p>Every space mission follows a chronological chain of events. Tap or click any two cards below to swap their positions until the timeline starts with <em>Launch</em> and finishes with <em>Primary Science Cruise / Mission Objective</em>!</p>
         </div>
 
         <div id="sequence-list" class="sequence-list">
@@ -425,7 +425,7 @@ export class PuzzleManager {
           `).join('')}
         </div>
         <div class="puzzle-actions">
-          <div id="seq-feedback" class="puzzle-feedback">Click any two cards to swap positions</div>
+          <div id="seq-feedback" class="puzzle-feedback">Tap or click any two cards to swap positions</div>
           <button id="btn-verify-seq" class="solve-btn">
             <i data-lucide="list-ordered"></i> VERIFY SEQUENCE
           </button>

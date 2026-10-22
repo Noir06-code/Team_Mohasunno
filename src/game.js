@@ -126,36 +126,58 @@ window.addEventListener("blur", () => {
     input.sprint = false;
 });
 
-// Touch / On-Screen Controls
+// Touch / On-Screen Controls with Multi-Touch Pointer Capture
+const isTouchDevice = () => ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth <= 900;
+
 function bindTouchButton(elementId, actionName) {
     const btn = document.getElementById(elementId);
     if (!btn) return;
 
     const startAction = (e) => {
-        e.preventDefault();
-        input[actionName] = true;
+        if (e.cancelable) e.preventDefault();
         btn.classList.add("active");
         AudioSynth.playClick();
+
+        if (actionName === "interact") {
+            if (isChatOpen) {
+                advanceChatStep();
+            } else {
+                triggerPopupAction();
+            }
+        } else {
+            input[actionName] = true;
+        }
+
+        if (btn.setPointerCapture && e.pointerId !== undefined) {
+            try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+        }
     };
 
     const endAction = (e) => {
-        e.preventDefault();
-        input[actionName] = false;
+        if (e.cancelable) e.preventDefault();
         btn.classList.remove("active");
+
+        if (actionName !== "interact") {
+            input[actionName] = false;
+        }
+
+        if (btn.releasePointerCapture && e.pointerId !== undefined) {
+            try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
     };
 
-    btn.addEventListener("touchstart", startAction, { passive: false });
-    btn.addEventListener("touchend", endAction, { passive: false });
-    btn.addEventListener("touchcancel", endAction, { passive: false });
-    btn.addEventListener("mousedown", startAction);
-    btn.addEventListener("mouseup", endAction);
-    btn.addEventListener("mouseleave", endAction);
+    btn.addEventListener("pointerdown", startAction);
+    btn.addEventListener("pointerup", endAction);
+    btn.addEventListener("pointercancel", endAction);
+    // Passive false touchstart to block unwanted scrolling/pinch gestures
+    btn.addEventListener("touchstart", (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 }
 
 bindTouchButton("btn-left", "left");
 bindTouchButton("btn-right", "right");
 bindTouchButton("btn-jump", "jump");
 bindTouchButton("btn-sprint", "sprint");
+bindTouchButton("btn-interact", "interact");
 
 // -------------------------
 // ASSETS
@@ -379,8 +401,11 @@ function launchThreeMission(missionId = "mission-01") {
             });
         } else {
             threeGameInstance.loadMission(missionId);
-            threeGameInstance.onWindowResize();
         }
+        threeGameInstance.onWindowResize();
+        requestAnimationFrame(() => {
+            if (threeGameInstance) threeGameInstance.onWindowResize();
+        });
         refreshIcons(threeContainer);
     }
 }
@@ -578,7 +603,8 @@ function AnimationLoop() {
             const gateMaxX = bgRenderW * 0.74;
             const isNearArchiveGate = (playerWorldX >= gateMinX && playerWorldX <= gateMaxX);
             if (isNearArchiveGate) {
-                updateQuest("Gate reached! Press [E] or click 'Enter NASA Archive' to proceed.");
+                const actionHint = isTouchDevice() ? "Tap 'Enter NASA Archive' or [Action]" : "Press [E] or click 'Enter NASA Archive'";
+                updateQuest(`Gate reached! ${actionHint} to proceed.`);
                 showPopup({
                     title: "NASA ARCHIVE",
                     desc: "Central Records Facility Entrance",
@@ -612,7 +638,8 @@ function AnimationLoop() {
             const deskCenter = deskWorldX + (deskW / 2);
             const isNearComputer = Math.abs(playerWorldX - deskCenter) < (110 * unit);
             if (isNearComputer) {
-                updateQuest("Terminal ready! Click [START MISSION 01] to investigate Pioneer 10 in 3D.");
+                const termHint = isTouchDevice() ? "Tap [START MISSION]" : "Click [START MISSION 01]";
+                updateQuest(`Terminal ready! ${termHint} to investigate Pioneer 10 in 3D.`);
                 showChatBubble();
             } else {
                 updateQuest("Approach the glowing TULIP Computer Workstation in the archive center.");
@@ -746,19 +773,60 @@ function AnimationLoop() {
 AnimationLoop();
 
 // -------------------------
-// FULLSCREEN SUPPORT
+// APPLICATION-WIDE FULLSCREEN SUPPORT
 // -------------------------
-function toggleFullscreen() {
+export function toggleFullscreen() {
     AudioSynth.playClick();
-    const container = document.getElementById("game-container") || canvas;
-    if (!document.fullscreenElement) {
-        if (container.requestFullscreen) {
-            container.requestFullscreen().catch(() => {});
+    const target = document.documentElement;
+    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+
+    if (!isFullscreen) {
+        if (target.requestFullscreen) {
+            target.requestFullscreen().catch(() => {});
+        } else if (target.webkitRequestFullscreen) {
+            target.webkitRequestFullscreen();
+        } else if (target.mozRequestFullScreen) {
+            target.mozRequestFullScreen();
+        } else if (target.msRequestFullscreen) {
+            target.msRequestFullscreen();
         }
     } else {
         if (document.exitFullscreen) {
             document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
         }
+    }
+}
+
+function updateFullscreenState() {
+    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    const iconName = isFullscreen ? "minimize-2" : "maximize-2";
+    const titleText = isFullscreen ? "Exit Fullscreen (F)" : "Toggle Fullscreen (F)";
+
+    const buttons = [
+        document.getElementById("fullscreen-btn"),
+        document.getElementById("btn-three-fullscreen")
+    ];
+
+    buttons.forEach(btn => {
+        if (btn) {
+            btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
+            btn.setAttribute("title", titleText);
+            btn.setAttribute("aria-label", titleText);
+            refreshIcons(btn);
+        }
+    });
+
+    resizeCanvas();
+    if (threeGameInstance) {
+        threeGameInstance.onWindowResize();
+        setTimeout(() => threeGameInstance?.onWindowResize(), 120);
+        setTimeout(() => threeGameInstance?.onWindowResize(), 320);
     }
 }
 
@@ -767,4 +835,14 @@ if (fullscreenBtn) {
     fullscreenBtn.addEventListener("click", toggleFullscreen);
 }
 
+const threeFullscreenBtn = document.getElementById("btn-three-fullscreen");
+if (threeFullscreenBtn) {
+    threeFullscreenBtn.addEventListener("click", toggleFullscreen);
+}
+
 canvas.addEventListener("dblclick", toggleFullscreen);
+
+document.addEventListener("fullscreenchange", updateFullscreenState);
+document.addEventListener("webkitfullscreenchange", updateFullscreenState);
+document.addEventListener("mozfullscreenchange", updateFullscreenState);
+document.addEventListener("MSFullscreenChange", updateFullscreenState);

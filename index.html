@@ -9,7 +9,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/style.css" />
     <style>
-      /* Critical pre-load styling to guarantee zero flash of unstyled content (FOUC) */
+      /* Critical pre-load styling to guarantee zero flash of unstyled content (FOUC) and strict no-selection */
+      *, *::before, *::after {
+        box-sizing: border-box;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -webkit-touch-callout: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      input, textarea {
+        user-select: text !important;
+        -webkit-user-select: text !important;
+      }
+      canvas {
+        touch-action: none;
+      }
       html, body {
         margin: 0;
         padding: 0;
@@ -135,6 +149,7 @@
           <button id="btn-right" class="touch-btn" aria-label="Move Right"><i data-lucide="arrow-right"></i></button>
         </div>
         <div class="touch-group touch-actions">
+          <button id="btn-interact" class="touch-btn action-btn interact-btn" aria-label="Action / Interact"><i data-lucide="hand"></i></button>
           <button id="btn-sprint" class="touch-btn action-btn sprint-btn" aria-label="Sprint"><i data-lucide="zap"></i></button>
           <button id="btn-jump" class="touch-btn action-btn jump-btn" aria-label="Jump"><i data-lucide="arrow-up"></i></button>
         </div>
@@ -183,18 +198,11 @@
         </div>
 
         <div class="hud-right">
-          <div class="clue-pill" id="hud-vault-pill">
-            <span class="pill-icon"><i data-lucide="database"></i></span>
-            <span class="pill-label">VAULT:</span>
-            <span class="pill-count" id="hud-clue-count">0 / 5</span>
-          </div>
-
           <!-- Camera View Switcher Dropdown -->
           <div class="camera-dropdown-container">
-            <button id="btn-camera-dropdown" class="hud-btn cam-btn" title="Change Camera View & Celestial Focus">
+            <button id="btn-camera-dropdown" class="hud-btn icon-only cam-btn" title="Camera Perspectives & Celestial Focus" aria-label="Camera Views">
               <i data-lucide="video"></i>
-              <span id="cam-active-name">ORBIT CAM</span>
-              <i data-lucide="chevron-down"></i>
+              <span id="cam-active-name" class="sr-only">ORBIT CAM</span>
             </button>
             <div id="cam-view-menu" class="cam-menu hidden">
               <div class="cam-menu-section">PERSPECTIVES</div>
@@ -217,27 +225,44 @@
           </div>
 
           <!-- Ride Space Shuttle Button -->
-          <button id="btn-ride-shuttle" class="hud-btn shuttle-btn" title="Launch & Pilot Space Shuttle from Earth">
-            <i data-lucide="rocket"></i> RIDE SHUTTLE
+          <button id="btn-ride-shuttle" class="hud-btn icon-only shuttle-btn" title="Launch & Pilot Space Shuttle Orbiter" aria-label="Pilot Space Shuttle">
+            <i data-lucide="rocket"></i>
           </button>
 
-          <button id="btn-student-guide" class="hud-btn guide-btn" title="Student Field Guide">
-            <i data-lucide="help-circle"></i> GUIDE
+          <!-- Student Field Guide Button -->
+          <button id="btn-student-guide" class="hud-btn icon-only guide-btn" title="Student Field Training Guide" aria-label="Field Guide">
+            <i data-lucide="help-circle"></i>
           </button>
-          <button id="btn-toggle-vault" class="hud-btn vault-btn">
-            <i data-lucide="database"></i> VAULT
+
+          <!-- Evidence Vault Button with Floating Badge -->
+          <button id="btn-toggle-vault" class="hud-btn icon-only vault-btn" title="Clue & Scientific Evidence Vault" aria-label="Clue Vault">
+            <i data-lucide="database"></i>
+            <span class="vault-badge-pill" id="hud-clue-count">0/5</span>
           </button>
-          <button id="btn-mission-select" class="hud-btn mission-btn">
-            <i data-lucide="compass"></i> MISSIONS
+
+          <!-- Solar System Mission Select Button -->
+          <button id="btn-mission-select" class="hud-btn icon-only mission-btn" title="Solar System Missions & Objectives" aria-label="Mission Select">
+            <i data-lucide="compass"></i>
           </button>
-          <button id="btn-hud-timeline" class="hud-btn timeline-btn" title="NASA Historical Chronological Timeline Directory (PDF Archive)">
-            <i data-lucide="book-marked"></i> TIMELINE
+
+          <!-- NASA Historical Chronological Timeline Directory -->
+          <button id="btn-hud-timeline" class="hud-btn icon-only timeline-btn" title="NASA Chronological Timeline Directory" aria-label="NASA Timeline">
+            <i data-lucide="book-marked"></i>
           </button>
-          <button id="btn-toggle-sound" class="hud-btn sound-btn" title="Toggle Audio (Synth)">
+
+          <!-- Audio Sound Toggle Button -->
+          <button id="btn-toggle-sound" class="hud-btn icon-only sound-btn" title="Toggle Audio Synthesizer" aria-label="Toggle Sound">
             <i data-lucide="volume-2"></i>
           </button>
-          <button id="btn-return-archive" class="hud-btn return-btn">
-            <i data-lucide="chevron-left"></i> ARCHIVE
+
+          <!-- Mission Fullscreen Toggle Button -->
+          <button id="btn-three-fullscreen" class="hud-btn icon-only fullscreen-btn" title="Toggle Fullscreen (F)" aria-label="Toggle Fullscreen">
+            <i data-lucide="maximize-2"></i>
+          </button>
+
+          <!-- Return to 2D Archive Room Button -->
+          <button id="btn-return-archive" class="hud-btn icon-only return-btn" title="Return to Archive Workstation" aria-label="Exit to Archive">
+            <i data-lucide="log-out"></i>
           </button>
         </div>
       </div>
@@ -361,6 +386,15 @@
           </div>
         </div>
       </div>
+
+      <!-- Native Mobile Tactical Floating Action Button -->
+      <button id="btn-mobile-inspect" class="mobile-action-btn hidden" aria-label="Inspect Beacon">
+        <div class="mobile-action-icon"><i data-lucide="scan"></i></div>
+        <div class="mobile-action-label">
+          <span class="action-tag"><i data-lucide="radio"></i> BEACON IN RANGE</span>
+          <span class="action-target-name" id="mobile-action-name">INSPECT HARDWARE</span>
+        </div>
+      </button>
 
       <!-- 3D Tooltip for Hovering on Hardware -->
       <div id="three-tooltip" class="three-tooltip hidden"></div>

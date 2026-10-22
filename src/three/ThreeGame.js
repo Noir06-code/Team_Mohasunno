@@ -111,13 +111,22 @@ export class ThreeGame {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Orbit Controls
+    // Orbit Controls optimized for touchscreens and desktop
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
-    this.controls.maxDistance = 16;
+    this.controls.maxDistance = 18;
     this.controls.minDistance = 1.0;
     this.controls.target.set(0, 0, 0);
+    this.controls.enablePan = false; // Strictly rotate with 1 finger to prevent pan jitters
+    this.controls.enableRotate = true;
+    this.controls.enableZoom = true;
+    this.controls.rotateSpeed = 0.85;
+    this.controls.zoomSpeed = 1.2;
+    this.controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
 
     // 1. Primary Sun Collimated Directional Light (emanates directly from the Sun's 3D position)
     this.sunLight = new THREE.DirectionalLight(0xfffbeb, 3.2);
@@ -152,10 +161,51 @@ export class ThreeGame {
     this.initOrientationHandler();
     this.initShuttleKeyboardControls();
 
-    // Event Listeners
+    // Event Listeners with Mobile Landscape Touch & Fullscreen Support
+    const triggerResize = () => {
+      this.onWindowResize();
+      setTimeout(() => this.onWindowResize(), 120);
+      setTimeout(() => this.onWindowResize(), 320);
+    };
+
     window.addEventListener("resize", () => this.onWindowResize());
+    window.addEventListener("orientationchange", triggerResize);
+    document.addEventListener("fullscreenchange", triggerResize);
+    document.addEventListener("webkitfullscreenchange", triggerResize);
+
     this.canvas.addEventListener("mousemove", (e) => this.onPointerMove(e));
     this.canvas.addEventListener("click", (e) => this.onPointerClick(e));
+
+    // Prevent browser default scroll/navigation gesture so OrbitControls touch drag is never cancelled
+    this.canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+    }, { passive: false });
+
+    // High-responsiveness pointer tap detector for mobile touchscreens
+    let pointerDownX = 0;
+    let pointerDownY = 0;
+    let pointerDownTime = 0;
+
+    this.canvas.addEventListener("pointerdown", (e) => {
+      pointerDownX = e.clientX;
+      pointerDownY = e.clientY;
+      pointerDownTime = Date.now();
+    }, { passive: true });
+
+    this.canvas.addEventListener("pointerup", (e) => {
+      const dx = e.clientX - pointerDownX;
+      const dy = e.clientY - pointerDownY;
+      const dist = Math.hypot(dx, dy);
+      const elapsed = Date.now() - pointerDownTime;
+      // If moved less than 18px and released under 500ms, it's a direct tap!
+      if (dist < 18 && elapsed < 500) {
+        this.handlePointerTap(e.clientX, e.clientY);
+      }
+    });
+
+    this.canvas.addEventListener("pointercancel", () => {
+      pointerDownTime = 0;
+    });
   }
 
   loadMission(missionId) {
@@ -376,6 +426,12 @@ export class ThreeGame {
     beamMesh.position.y = -0.15;
     group.add(beamMesh);
 
+    // 4. Generous invisible hit-proxy sphere for reliable finger taps on mobile touchscreens
+    const hitProxyGeo = new THREE.SphereGeometry(0.52, 12, 12);
+    const hitProxyMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    const hitProxy = new THREE.Mesh(hitProxyGeo, hitProxyMat);
+    group.add(hitProxy);
+
     group.userData = {
       name,
       puzzleType,
@@ -425,10 +481,12 @@ export class ThreeGame {
       this.canvas.style.cursor = "pointer";
 
       if (tooltip) {
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth <= 900;
+        const actionLabel = isTouch ? 'Tap to Inspect' : '[Click or Press E] Inspect';
         tooltip.innerHTML = `
           <div class="tip-content">
             <span class="tip-icon"><i data-lucide="${topGroup.userData.iconName}"></i></span>
-            <span class="tip-text"><strong>[Click or Press E]</strong> Inspect ${topGroup.userData.name}</span>
+            <span class="tip-text"><strong>${actionLabel}</strong> ${topGroup.userData.name}</span>
           </div>
         `;
         tooltip.style.left = `${event.clientX + 16}px`;
@@ -476,26 +534,51 @@ export class ThreeGame {
     }
   }
 
-  onPointerClick(event) {
+  triggerHotspotAction(topGroup) {
+    if (!topGroup || !topGroup.userData) return;
+    const { puzzleType, name } = topGroup.userData;
+    AudioSynth.playClick();
+    if (puzzleType === "plaque") {
+      const currentData = MISSIONS_DATA[this.currentMissionId];
+      const masterClue = currentData?.clues.find(c => c.rarity === "master") || currentData?.clues[currentData.clues.length - 1];
+      if (masterClue) {
+        this.vault.unlockClue(this.currentMissionId, masterClue.id);
+        this.onClueRecovered(masterClue.id);
+      }
+      AudioSynth.playClueChime();
+      this.showPlaqueInspectionModal(masterClue);
+    } else {
+      this.puzzleManager.openPuzzle(this.currentMissionId, puzzleType);
+    }
+  }
+
+  handlePointerTap(clientX, clientY) {
+    const now = Date.now();
+    if (this.lastTapTimestamp && (now - this.lastTapTimestamp < 320)) {
+      return;
+    }
+    this.lastTapTimestamp = now;
+
     if (this.spaceShuttle && this.spaceShuttle.isFlying) {
       return;
     }
 
-    if (this.hoveredObject) {
-      const { puzzleType, name } = this.hoveredObject.userData;
-      if (puzzleType === "plaque") {
-        const currentData = MISSIONS_DATA[this.currentMissionId];
-        const masterClue = currentData?.clues.find(c => c.rarity === "master") || currentData?.clues[currentData.clues.length - 1];
-        if (masterClue) {
-          this.vault.unlockClue(this.currentMissionId, masterClue.id);
-          this.onClueRecovered(masterClue.id);
-        }
-        AudioSynth.playClueChime();
-        this.showPlaqueInspectionModal(masterClue);
-      } else {
-        this.puzzleManager.openPuzzle(this.currentMissionId, puzzleType);
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.hotspots, true);
+
+    if (intersects.length > 0) {
+      let topGroup = intersects[0].object;
+      while (topGroup.parent && !topGroup.userData.name) {
+        topGroup = topGroup.parent;
       }
-      return;
+      if (topGroup && topGroup.userData && topGroup.userData.name) {
+        this.triggerHotspotAction(topGroup);
+        return;
+      }
     }
 
     // Inspect clicked celestial body
@@ -519,6 +602,10 @@ export class ThreeGame {
         );
       }
     }
+  }
+
+  onPointerClick(event) {
+    this.handlePointerTap(event.clientX, event.clientY);
   }
 
   showPlaqueInspectionModal(masterClue) {
@@ -572,7 +659,7 @@ export class ThreeGame {
 
     const hudVaultCount = document.getElementById("hud-clue-count");
     if (hudVaultCount) {
-      hudVaultCount.textContent = `${this.vault.getUnlockedCount(this.currentMissionId)} / 5`;
+      hudVaultCount.textContent = `${this.vault.getUnlockedCount(this.currentMissionId)}/5`;
     }
 
     const currentData = MISSIONS_DATA[this.currentMissionId];
@@ -623,7 +710,7 @@ export class ThreeGame {
     if (titleEl) titleEl.textContent = data.title;
     if (eraEl) eraEl.textContent = data.era;
     if (hardwareEl) hardwareEl.textContent = data.hardware;
-    if (clueCountEl) clueCountEl.textContent = `${this.vault.getUnlockedCount(data.id)} / 5`;
+    if (clueCountEl) clueCountEl.textContent = `${this.vault.getUnlockedCount(data.id)}/5`;
 
     if (objectiveEl) {
       Typewriter.type(objectiveEl, data.objective, { speed: 14, audio: false });
@@ -751,7 +838,11 @@ export class ThreeGame {
     };
 
     window.addEventListener("resize", checkOrientation);
-    window.addEventListener("orientationchange", checkOrientation);
+    window.addEventListener("orientationchange", () => {
+      checkOrientation();
+      setTimeout(checkOrientation, 150);
+      setTimeout(checkOrientation, 350);
+    });
     checkOrientation();
 
     const dismissBtn = document.getElementById("btn-dismiss-orientation-warning");
@@ -974,12 +1065,24 @@ export class ThreeGame {
     const bindBtn = (id, onDown, onUp) => {
       const el = document.getElementById(id);
       if (!el) return;
-      const down = (e) => { e.preventDefault(); onDown(); };
-      const up = (e) => { e.preventDefault(); onUp(); };
-      el.addEventListener("touchstart", down, { passive: false });
-      el.addEventListener("touchend", up, { passive: false });
-      el.addEventListener("mousedown", down);
-      el.addEventListener("mouseup", up);
+      const down = (e) => {
+        if (e.cancelable) e.preventDefault();
+        onDown();
+        if (el.setPointerCapture && e.pointerId !== undefined) {
+          try { el.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+      };
+      const up = (e) => {
+        if (e.cancelable) e.preventDefault();
+        onUp();
+        if (el.releasePointerCapture && e.pointerId !== undefined) {
+          try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+      };
+      el.addEventListener("pointerdown", down);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", up);
+      el.addEventListener("touchstart", (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
     };
 
     bindBtn("touch-pitch-up", () => this.shuttleInput.up = true, () => this.shuttleInput.up = false);
@@ -987,13 +1090,26 @@ export class ThreeGame {
     bindBtn("touch-yaw-left", () => this.shuttleInput.left = true, () => this.shuttleInput.left = false);
     bindBtn("touch-yaw-right", () => this.shuttleInput.right = true, () => this.shuttleInput.right = false);
 
+    let throttleInterval = null;
     bindBtn("touch-throttle-up", () => {
-      if (this.spaceShuttle) this.spaceShuttle.setThrottle(this.spaceShuttle.throttle + 0.2);
-    }, () => {});
+      if (this.spaceShuttle) this.spaceShuttle.setThrottle(this.spaceShuttle.throttle + 0.15);
+      clearInterval(throttleInterval);
+      throttleInterval = setInterval(() => {
+        if (this.spaceShuttle) this.spaceShuttle.setThrottle(this.spaceShuttle.throttle + 0.08);
+      }, 100);
+    }, () => {
+      clearInterval(throttleInterval);
+    });
 
     bindBtn("touch-throttle-down", () => {
-      if (this.spaceShuttle) this.spaceShuttle.setThrottle(this.spaceShuttle.throttle - 0.2);
-    }, () => {});
+      if (this.spaceShuttle) this.spaceShuttle.setThrottle(this.spaceShuttle.throttle - 0.15);
+      clearInterval(throttleInterval);
+      throttleInterval = setInterval(() => {
+        if (this.spaceShuttle) this.spaceShuttle.setThrottle(this.spaceShuttle.throttle - 0.08);
+      }, 100);
+    }, () => {
+      clearInterval(throttleInterval);
+    });
   }
 
   initUI() {
@@ -1005,6 +1121,23 @@ export class ThreeGame {
         if (this.mischief) this.mischief.stop();
         if (this.solarSystemMap) this.solarSystemMap.stop();
         if (this.onReturnToArchive) this.onReturnToArchive();
+      };
+    }
+
+    // 3D Mission Fullscreen Toggle Button
+    const threeFsBtn = document.getElementById("btn-three-fullscreen");
+    if (threeFsBtn) {
+      threeFsBtn.onclick = () => {
+        AudioSynth.playClick();
+        const target = document.documentElement;
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (!isFs) {
+          if (target.requestFullscreen) target.requestFullscreen().catch(() => {});
+          else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        } else {
+          if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
       };
     }
 
@@ -1124,6 +1257,19 @@ export class ThreeGame {
     // Mobile touch controls for shuttle flight
     this.initShuttleTouchControls();
 
+    // Native Mobile Tactical Inspect Floating Button
+    const mobileInspectBtn = document.getElementById("btn-mobile-inspect");
+    if (mobileInspectBtn) {
+      mobileInspectBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (this.activeMobileTarget) {
+          this.triggerHotspotAction(this.activeMobileTarget);
+        } else if (this.hotspots.length > 0) {
+          this.triggerHotspotAction(this.hotspots[0]);
+        }
+      };
+    }
+
     // Student Field Guide Modal
     const guideBtn = document.getElementById("btn-student-guide");
     const guideModal = document.getElementById("student-guide-modal");
@@ -1187,9 +1333,10 @@ export class ThreeGame {
             this.selectedModalMissionId = mId;
             this.updateMissionBriefing(mId);
           });
-        } else {
-          this.solarSystemMap.resize();
         }
+        this.solarSystemMap.resize();
+        setTimeout(() => this.solarSystemMap?.resize(), 60);
+        setTimeout(() => this.solarSystemMap?.resize(), 240);
 
         this.selectedModalMissionId = this.currentMissionId;
         this.updateMissionBriefing(this.currentMissionId);
@@ -1491,6 +1638,44 @@ export class ThreeGame {
           h.userData.ringMesh.material.color.setHex(isHov ? 0xf59e0b : 0x38bdf8);
         }
       });
+
+      // Update Native Mobile Inspect Floating Button
+      const mobileInspectBtn = document.getElementById("btn-mobile-inspect");
+      const mobileActionName = document.getElementById("mobile-action-name");
+      if (mobileInspectBtn && this.hotspots.length > 0) {
+        let targetHotspot = this.hoveredObject;
+        if (!targetHotspot) {
+          let closestDist = Infinity;
+          const tempVec = new THREE.Vector3();
+          for (const h of this.hotspots) {
+            h.getWorldPosition(tempVec);
+            tempVec.project(this.camera);
+            if (tempVec.z < 1.0) {
+              const dist = Math.hypot(tempVec.x, tempVec.y);
+              if (dist < 0.65 && dist < closestDist) {
+                closestDist = dist;
+                targetHotspot = h;
+              }
+            }
+          }
+        }
+
+        if (targetHotspot && targetHotspot.userData && targetHotspot.userData.name) {
+          if (mobileActionName && mobileActionName.textContent !== targetHotspot.userData.name.toUpperCase()) {
+            mobileActionName.textContent = targetHotspot.userData.name.toUpperCase();
+          }
+          mobileInspectBtn.classList.remove("hidden");
+          this.activeMobileTarget = targetHotspot;
+        } else {
+          mobileInspectBtn.classList.add("hidden");
+          this.activeMobileTarget = null;
+        }
+      } else if (mobileInspectBtn) {
+        mobileInspectBtn.classList.add("hidden");
+      }
+    } else {
+      const mobileInspectBtn = document.getElementById("btn-mobile-inspect");
+      if (mobileInspectBtn) mobileInspectBtn.classList.add("hidden");
     }
 
     if (this.controls && (!this.spaceShuttle || !this.spaceShuttle.isFlying || this.spaceShuttle.cameraMode === 'orbit')) {

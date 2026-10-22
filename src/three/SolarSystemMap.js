@@ -166,6 +166,22 @@ export class SolarSystemMap {
     });
 
     this.canvas.addEventListener("click", (e) => this.onClick(e));
+
+    // Mobile touch tap detection
+    let startX = 0, startY = 0, startTime = 0;
+    this.canvas.addEventListener("pointerdown", (e) => {
+      startX = e.clientX;
+      startY = e.clientY;
+      startTime = Date.now();
+    }, { passive: true });
+
+    this.canvas.addEventListener("pointerup", (e) => {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.hypot(dx, dy) < 18 && (Date.now() - startTime) < 500) {
+        this.onClick(e);
+      }
+    });
   }
 
   setSelectedMission(missionId) {
@@ -178,14 +194,14 @@ export class SolarSystemMap {
     const my = e.clientY - rect.top;
 
     let found = null;
-    const hitPadding = 18;
+    const hitPadding = 22;
 
     for (const b of this.bodies) {
       if (b.screenX !== undefined && b.screenY !== undefined) {
         const dx = mx - b.screenX;
         const dy = my - b.screenY;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist <= b.size + hitPadding || (b.isSun && dist <= b.radius + 6)) {
+        if (dist <= b.size + hitPadding || (b.isSun && dist <= b.radius + 10)) {
           found = b;
           break;
         }
@@ -206,13 +222,13 @@ export class SolarSystemMap {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
-    const hitPadding = 20;
+    const hitPadding = 28;
     for (const b of this.bodies) {
       if (b.missionId && b.screenX !== undefined && b.screenY !== undefined) {
         const dx = mx - b.screenX;
         const dy = my - b.screenY;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist <= b.size + hitPadding) {
+        if (dist <= Math.max(b.size + hitPadding, 30)) {
           AudioSynth.playClick();
           this.selectedMissionId = b.missionId;
           if (this.onSelectCallback) {

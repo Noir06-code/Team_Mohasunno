@@ -31,15 +31,19 @@ export class SpaceShuttle {
     this.currentPitch = 0;
     this.isWarping = false;
 
+    // Smoothed Angular Velocities for steady, vibration-free flight
+    this.angularVelocity = { pitch: 0, yaw: 0, roll: 0 };
+    this.smoothedCamPos = null;
+    this.smoothedCamLook = null;
+
     // Camera Mode: 'chase', 'cockpit', 'orbit'
     this.cameraMode = 'chase';
     this.baseFov = 45;
     this.targetFov = 45;
 
-    // Particle Plumes & Warp Streaks
+    // Particle Plumes
     this.exhaustPlumes = [];
     this.exhaustCore = null;
-    this.warpStreaks = null;
 
     // Navigation Autopilot Target
     this.navTarget = null;
@@ -52,7 +56,6 @@ export class SpaceShuttle {
 
     this.buildProceduralShuttle();
     this.loadGLBShuttle();
-    this.createWarpStreaks();
   }
   buildProceduralShuttle() {
     // White upper thermal insulation blankets & black tiles
@@ -246,47 +249,15 @@ export class SpaceShuttle {
     );
   }
 
-  createWarpStreaks() {
-    const streakCount = 180;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(streakCount * 6);
-
-    for (let i = 0; i < streakCount; i++) {
-      const idx = i * 6;
-      const angle = Math.random() * Math.PI * 2;
-      const r = 1.8 + Math.random() * 14.0;
-      const x = Math.cos(angle) * r;
-      const y = Math.sin(angle) * r;
-      const z = (Math.random() - 0.5) * 50;
-      const len = 4.0 + Math.random() * 8.0;
-
-      positions[idx] = x;
-      positions[idx + 1] = y;
-      positions[idx + 2] = z;
-
-      positions[idx + 3] = x;
-      positions[idx + 4] = y;
-      positions[idx + 5] = z - len;
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.LineBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.0,
-      blending: THREE.AdditiveBlending
-    });
-
-    this.warpStreaks = new THREE.LineSegments(geometry, material);
-    this.group.add(this.warpStreaks);
-  }
-
   launchFromEarth() {
     this.isFlying = true;
     this.isLaunching = true;
     this.launchTimer = 0;
     this.throttle = 1.0;
     this.speed = 14.0;
+    this.angularVelocity = { pitch: 0, yaw: 0, roll: 0 };
+    this.smoothedCamPos = null;
+    this.smoothedCamLook = null;
 
     // Anchor at Earth
     const earthPos = this.spaceEnv?.earth ? this.spaceEnv.earth.position.clone() : new THREE.Vector3(-45, 18, -80);
@@ -299,13 +270,16 @@ export class SpaceShuttle {
     AudioSynth.playTerminalAlert();
 
     this.cameraMode = 'chase';
-    this.updateCamera();
+    this.updateCamera(0.016);
   }
 
   exitFlight() {
     this.isFlying = false;
     this.isLaunching = false;
     this.isWarping = false;
+    this.angularVelocity = { pitch: 0, yaw: 0, roll: 0 };
+    this.smoothedCamPos = null;
+    this.smoothedCamLook = null;
     this.group.visible = false;
     if (this.controls) {
       this.controls.enabled = true;
@@ -335,6 +309,8 @@ export class SpaceShuttle {
     } else {
       this.cameraMode = 'chase';
     }
+    this.smoothedCamPos = null;
+    this.smoothedCamLook = null;
     AudioSynth.playClick();
   }
 
@@ -354,83 +330,75 @@ export class SpaceShuttle {
     // 1. Launch liftoff climb
     if (this.isLaunching) {
       this.launchTimer += delta;
-      this.group.translateZ(this.speed * delta * 1.6);
-      this.group.rotation.x = Math.max(0, this.group.rotation.x - delta * 0.12);
+      this.group.translateZ(this.speed * delta * 1.5);
+      this.group.rotation.x = Math.max(0, this.group.rotation.x - delta * 0.1);
 
       if (this.launchTimer > 3.2) {
         this.isLaunching = false;
       }
     } else {
-      // 2. Active Aerodynamic Steering
+      // 2. Active Aerodynamic Steering with Damped Angular Momentum (Steady & Vibration-Free)
       const pitchInput = (inputState.up ? 1 : 0) - (inputState.down ? 1 : 0);
       const yawInput = (inputState.left ? 1 : 0) - (inputState.right ? 1 : 0);
       const rollInput = (inputState.rollLeft ? 1 : 0) - (inputState.rollRight ? 1 : 0);
+      const hasManualInput = (pitchInput !== 0 || yawInput !== 0 || rollInput !== 0);
 
-      // Aerodynamic banking into turns: yawing rolls the shuttle into the turn
-      const targetBank = -yawInput * 0.45;
-      this.bankAngle = THREE.MathUtils.lerp(this.bankAngle, targetBank, delta * 4.5);
+      // Desired angular targets
+      const targetPitchVel = pitchInput * 0.95;
+      const targetYawVel = yawInput * 0.95;
+      const targetRollVel = (rollInput * 1.15) + (-yawInput * 0.35);
 
-      const turnSpeed = 1.35 * delta;
-      this.group.rotateX(pitchInput * turnSpeed);
-      this.group.rotateY(yawInput * turnSpeed);
-      this.group.rotateZ((rollInput * turnSpeed * 1.4) + (this.bankAngle * delta * 0.8));
+      // Smooth exponential damping to eliminate abrupt turns and vibrations
+      const steerDamp = 1 - Math.exp(-6.5 * delta);
+      this.angularVelocity.pitch = THREE.MathUtils.lerp(this.angularVelocity.pitch, targetPitchVel, steerDamp);
+      this.angularVelocity.yaw = THREE.MathUtils.lerp(this.angularVelocity.yaw, targetYawVel, steerDamp);
+      this.angularVelocity.roll = THREE.MathUtils.lerp(this.angularVelocity.roll, targetRollVel, steerDamp);
 
-      // Autopilot correction towards nav target
-      if (this.navTarget) {
+      this.group.rotateX(this.angularVelocity.pitch * delta);
+      this.group.rotateY(this.angularVelocity.yaw * delta);
+      this.group.rotateZ(this.angularVelocity.roll * delta);
+
+      // Autopilot correction towards nav target: yields when pilot steers to avoid fighting input
+      if (this.navTarget && !hasManualInput) {
         const targetWorldPos = this.navTarget.position.clone();
         const dirToTarget = targetWorldPos.sub(this.group.position).normalize();
 
         const qTarget = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirToTarget);
-        this.group.quaternion.slerp(qTarget, delta * 1.5);
+        this.group.quaternion.slerp(qTarget, delta * 0.85);
       }
 
       // 3. Throttle and Acceleration
       const baseSpeed = 22 * this.throttle;
-      const warpMultiplier = this.isWarping ? 5.5 : 1.0;
+      const warpMultiplier = this.isWarping ? 5.0 : 1.0;
       const targetSpeed = baseSpeed * warpMultiplier;
-      this.speed = THREE.MathUtils.lerp(this.speed, targetSpeed, delta * 3.0);
+      this.speed = THREE.MathUtils.lerp(this.speed, targetSpeed, delta * 2.8);
 
       // Forward flight along +Z
       this.group.translateZ(this.speed * delta);
     }
 
-    // 4. Exhaust Plume Effects
-    const plumeScale = (0.7 + this.throttle * 1.3) * (this.isWarping ? 2.4 : 1.0);
-    const plumeFlicker = Math.sin(Date.now() / 30) * 0.18;
+    // 4. Smooth, Steady Exhaust Plume Glow (No Rapid High-Frequency Flicker)
+    const plumeScale = (0.75 + this.throttle * 1.25) * (this.isWarping ? 2.2 : 1.0);
+    const plumeFlicker = Math.sin(Date.now() / 400) * 0.03; // Smooth gentle breathing glow
     this.exhaustPlumes.forEach(p => {
-      p.scale.set(plumeScale, plumeScale + plumeFlicker, plumeScale * 1.5);
+      p.scale.set(plumeScale, plumeScale + plumeFlicker, plumeScale * 1.4);
       p.material.color.setHex(this.isWarping ? 0xa855f7 : (this.throttle > 0.8 ? 0x38bdf8 : 0xf97316));
     });
 
-    // 5. Warp Streaks Animation & Dynamic FOV
-    if (this.warpStreaks) {
-      const targetOpacity = this.isWarping ? 0.85 : 0.0;
-      this.warpStreaks.material.opacity = THREE.MathUtils.lerp(this.warpStreaks.material.opacity, targetOpacity, delta * 6.0);
-      if (this.isWarping) {
-        const posAttr = this.warpStreaks.geometry.attributes.position;
-        for (let i = 0; i < posAttr.count; i++) {
-          let z = posAttr.getZ(i);
-          z -= delta * 140;
-          if (z < -30) z += 60;
-          posAttr.setZ(i, z);
-        }
-        posAttr.needsUpdate = true;
-      }
-    }
-
+    // 5. Dynamic FOV
     if (this.camera) {
-      this.targetFov = this.isWarping ? 62 : 45;
+      this.targetFov = this.isWarping ? 58 : 45;
       if (Math.abs(this.camera.fov - this.targetFov) > 0.1) {
-        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, this.targetFov, delta * 3.5);
+        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, this.targetFov, delta * 3.0);
         this.camera.updateProjectionMatrix();
       }
     }
 
-    // 6. Update Camera
-    this.updateCamera();
+    // 6. Smooth Camera Update
+    this.updateCamera(delta);
   }
 
-  updateCamera() {
+  updateCamera(delta = 0.016) {
     if (!this.camera || !this.isFlying) return;
 
     if (this.controls) {
@@ -438,12 +406,20 @@ export class SpaceShuttle {
     }
 
     if (this.cameraMode === 'chase') {
-      const offset = new THREE.Vector3(0, 1.8, -6.8).applyQuaternion(this.group.quaternion);
-      const targetCamPos = this.group.position.clone().add(offset);
-      this.camera.position.lerp(targetCamPos, 0.18);
+      if (!this.smoothedCamPos) this.smoothedCamPos = this.camera.position.clone();
+      if (!this.smoothedCamLook) this.smoothedCamLook = this.group.position.clone();
 
-      const lookAhead = new THREE.Vector3(0, 0.4, 15).applyQuaternion(this.group.quaternion);
-      this.camera.lookAt(this.group.position.clone().add(lookAhead));
+      const offset = new THREE.Vector3(0, 1.7, -7.0).applyQuaternion(this.group.quaternion);
+      const targetCamPos = this.group.position.clone().add(offset);
+      const posDamp = 1 - Math.exp(-5.5 * delta);
+      this.smoothedCamPos.lerp(targetCamPos, posDamp);
+      this.camera.position.copy(this.smoothedCamPos);
+
+      const lookAhead = new THREE.Vector3(0, 0.35, 18).applyQuaternion(this.group.quaternion);
+      const targetLook = this.group.position.clone().add(lookAhead);
+      const lookDamp = 1 - Math.exp(-7.5 * delta);
+      this.smoothedCamLook.lerp(targetLook, lookDamp);
+      this.camera.lookAt(this.smoothedCamLook);
     } else if (this.cameraMode === 'cockpit') {
       // First-person commander cockpit view through windshield
       const eyePos = new THREE.Vector3(0, 0.52, 1.5).applyQuaternion(this.group.quaternion);
